@@ -77,9 +77,18 @@ export default {
     },
     editorInit: function (editor) {
       require('brace/ext/language_tools') //language extension prerequisite...
-      this.modes.forEach(mode => {
-        require('brace/mode/' + mode); //language
-      });
+      require('brace/mode/text');
+      require('brace/mode/json');
+      require('brace/mode/xml');
+      require('brace/mode/html');
+      require('brace/mode/java');
+      require('brace/mode/python');
+      require('brace/mode/sql');
+      require('brace/mode/javascript');
+      require('brace/mode/yaml');
+      // this.modes.forEach((mode) => {
+      //   require('brace/mode/' + mode); //language
+      // });
       require('brace/theme/' + this.theme)
       require('brace/snippets/javascript') //snippet
       if (this.readOnly) {

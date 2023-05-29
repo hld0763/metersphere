@@ -107,9 +107,9 @@
 <script>
 import MsJsonCodeEdit from './json-view/ComparedEditor';
 import MsApiKeyValueDetail from './common/ApiKeyValueDetail';
+import {formatters} from 'jsondiffpatch';
 
-const jsondiffpatch = require('jsondiffpatch');
-const formattersHtml = jsondiffpatch.formatters.html;
+const formattersHtml = formatters.html;
 
 export default {
   name: 'MsApiHttpRequestParams',

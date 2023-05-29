@@ -12,6 +12,25 @@
     continue.</strong>
 </noscript>
 <div id="app"></div>
+<% if (process.env.NODE_ENV === 'development') { %>
+  // 开发环境下的代码
+  <script src="<%= BASE_URL %>js/dev/vue.js"></script>
+  <script src="<%= BASE_URL %>js/dev/vue-router.js"></script>
+  <script src="<%= BASE_URL %>js/dev/vue-shepherd.js"></script>
+  <script type="module" src="<%= BASE_URL %>js/dev/qiankun.umd.js"></script>
+  <script type="module" src="<%= BASE_URL %>js/dev/element-ui/element-ui.js"></script>
+  <script type="module" src="<%= BASE_URL %>js/dev/brace.js"></script>
+  <script type="module" src="<%= BASE_URL %>js/dev/mock.js"></script>
+  <script type="module" src="<%= BASE_URL %>js/dev/jsencrypt.js"></script>
+  <script type="module" src="<%= BASE_URL %>js/dev/jspdf.es.js"></script>
+  <script type="module" src="<%= BASE_URL %>js/dev/html2canvas.js"></script>
+  <script type="module" src="<%= BASE_URL %>js/dev/pdfjs-dist/pdf.js"></script>
+  <script type="module" src="<%= BASE_URL %>js/dev/echarts.js"></script>
+  <script type="module" src="<%= BASE_URL %>js/dev/zrender.js"></script>
+  <script type="module" src="<%= BASE_URL %>js/dev/jsondiffpatch/jsondiffpatch.umd.js"></script>
+<% } else { %>
+  // 生产环境下的代码
+<% } %>
 <!-- built files will be auto injected -->
 </body>
 </html>

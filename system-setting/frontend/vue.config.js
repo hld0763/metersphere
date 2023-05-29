@@ -1,5 +1,6 @@
 const path = require('path');
-const {name} = require('./package');
+const { name } = require('./package');
+const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
 
 function resolve(dir) {
   return path.join(__dirname, dir);
@@ -16,11 +17,11 @@ module.exports = {
     webSocketServer: 'sockjs',
     proxy: {
       ['^((?!/login)(?!/document))']: {
-        target: 'http://localhost:8001',
+        target: 'http://192.168.0.41:8001',
         ws: false
       },
       '/websocket': {
-        target: 'http://localhost:8001',
+        target: 'http://192.168.0.41:8001',
         ws: true
       },
     },
@@ -72,5 +73,15 @@ module.exports = {
       .options({
         symbolId: 'icon-[name]'
       })
+    
+      if (process.env.NODE_ENV === 'analyze') {
+        config.plugin('webpack-report').use(BundleAnalyzerPlugin, [
+          {
+            analyzerMode: 'static',
+            reportFilename: './dist/webpack-report.html',
+            openAnalyzer: false,
+          },
+        ]);
+      }
   }
 };

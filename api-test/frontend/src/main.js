@@ -17,7 +17,7 @@ import chart from 'metersphere-frontend/src/chart';
 import VueFab from 'vue-float-action-button';
 import JSONPathPicker from 'vue-jsonpath-picker';
 import VueClipboard from 'vue-clipboard2';
-import formCreate from '@form-create/element-ui';
+// import formCreate from '@form-create/element-ui';
 import mavonEditor from 'mavon-editor';
 import 'mavon-editor/dist/css/index.css';
 import VuePapaParse from 'vue-papa-parse';
@@ -45,7 +45,7 @@ Vue.use(VueClipboard);
 Vue.use(VueFab);
 Vue.use(JSONPathPicker);
 Vue.use(mavonEditor);
-Vue.use(formCreate);
+// Vue.use(formCreate);
 Vue.use(VuePapaParse);
 Vue.use(VueShepherd);
 

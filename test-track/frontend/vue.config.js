@@ -3,6 +3,7 @@ const {name} = require('./package');
 
 const HtmlWebpackInlineSourcePlugin = require('html-webpack-inline-source-plugin')
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
 
 function resolve(dir) {
   return path.join(__dirname, dir);
@@ -19,11 +20,11 @@ module.exports = {
     webSocketServer: 'sockjs',
     proxy: {
       ['^((?!/login)(?!/document))']: {
-        target: 'http://localhost:8005',
+        target: 'http://192.168.0.41:8005',
         ws: false
       },
       '/websocket': {
-        target: 'http://localhost:8005',
+        target: 'http://192.168.0.41:8005',
         ws: true
       },
     },
@@ -66,7 +67,88 @@ module.exports = {
       // 打包后js的名称
       filename: `js/${name}-[name].[contenthash:8].js`,
       chunkFilename: `js/${name}-[name].[contenthash:8].js`,
-    }
+    },
+    // externals: ['element-ui', 'mockjs', 'vue', 'html2canvas'],
+    // optimization: {
+    //   splitChunks: {
+    //     cacheGroups: {
+    //       'chunk-vendors': {
+    //         test: /[\\/]node_modules[\\/]/,
+    //         name: 'chunk-vendors',
+    //         priority: 1,
+    //         minChunks: 3,
+    //         chunks: 'all',
+    //       },
+    //       'chunk-common': {
+    //         test: /[\\/]src[\\/]/,
+    //         name: 'chunk-common',
+    //         priority: 1,
+    //         minChunks: 3,
+    //         chunks: 'async',
+    //       },
+    //       brace: {
+    //         test: /[\\/]node_modules[\\/]brace[\\/]/,
+    //         name: 'brace',
+    //         priority: 2,
+    //         chunks: 'all',
+    //       },
+    //       echarts: {
+    //         test: /[\\/]node_modules[\\/]echarts[\\/]/,
+    //         name: 'echarts',
+    //         priority: 2,
+    //         chunks: 'all',
+    //       },
+    //       zrender: {
+    //         test: /[\\/]node_modules[\\/]zrender[\\/]/,
+    //         name: 'zrender',
+    //         priority: 2,
+    //         chunks: 'all',
+    //       },
+    //       'mavon-editor': {
+    //         test: /[\\/]mavon-editor[\\/]/,
+    //         name: 'mavon-editor',
+    //         priority: 2,
+    //         chunks: 'all',
+    //       },
+    //       'fortawesome': {
+    //         test: /[\\/]@fortawesome[\\/]/,
+    //         name: 'fortawesome',
+    //         priority: 2,
+    //         chunks: 'all',
+    //       },
+    //       'jspdf': {
+    //         test: /[\\/]jspdf[\\/]/,
+    //         name: 'jspdf',
+    //         priority: 2,
+    //         chunks: 'all',
+    //       },
+    //       jsondiffpatch: {
+    //         test: /[\\/]jsondiffpatch[\\/]/,
+    //         name: 'jsondiffpatch',
+    //         priority: 2,
+    //         chunks: 'all',
+    //       },
+    //       'pdfjs-dist': {
+    //         test: /[\\/]pdfjs-dist[\\/]/,
+    //         name: 'pdfjs-dist',
+    //         priority: 2,
+    //         chunks: 'all',
+    //       },
+    //       'vue-minder-editor-plus': {
+    //         test: /[\\/]vue-minder-editor-plus[\\/]/,
+    //         name: 'vue-minder-editor-plus',
+    //         priority: 2,
+    //         chunks: 'all',
+    //       },
+    //       ckeditor: {
+    //         test: /[\\/]@ckeditor[\\/]/,
+    //         name: 'ckeditor',
+    //         priority: 2,
+    //         chunks: 'all',
+    //       },
+    //     },
+    //   },
+    // },
   },
   css: {
     // 将组件内的 CSS 提取到一个单独的 CSS 文件 (只用在生产环境中)
@@ -101,5 +183,15 @@ module.exports = {
       .use(HtmlWebpackInlineSourcePlugin, [HtmlWebpackPlugin]);
 
     config.plugins.delete('prefetch');
+
+    if (process.env.NODE_ENV === 'analyze') {
+      config.plugin('webpack-report').use(BundleAnalyzerPlugin, [
+        {
+          analyzerMode: 'static',
+          reportFilename: './dist/webpack-report.html',
+          openAnalyzer: false,
+        },
+      ]);
+    }
   }
 };

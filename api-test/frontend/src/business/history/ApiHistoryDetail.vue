@@ -26,8 +26,9 @@
 </template>
 
 <script>
-const jsondiffpatch = require('jsondiffpatch');
-const formattersHtml = jsondiffpatch.formatters.html;
+import {formatters} from 'jsondiffpatch';
+
+const formattersHtml = formatters.html;
 export default {
   name: 'MsHistoryDetail',
   components: {},
