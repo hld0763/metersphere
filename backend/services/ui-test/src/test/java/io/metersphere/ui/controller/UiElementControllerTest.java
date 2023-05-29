@@ -1,8 +1,9 @@
-package io.metersphere.project.controller;
+package io.metersphere.ui.controller;
 
 import com.jayway.jsonpath.JsonPath;
-import io.metersphere.project.domain.Project;
 import io.metersphere.sdk.util.JSON;
+import io.metersphere.ui.domain.UiElement;
+import io.metersphere.ui.dto.LocationType;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -18,45 +19,51 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-
 @SpringBootTest
 @AutoConfigureMockMvc
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class ProjectControllerTests {
+public class UiElementControllerTest {
+
     @Resource
     private MockMvc mockMvc;
 
-    private static String projectId;
+    private static String elementId;
 
-    // 添加项目
+    // 添加元素
     @Test
     @Order(1)
-    public void testAddProject() throws Exception {
-        Project project = new Project();
-        project.setName("test");
-        project.setCreateUser("admin");
-        project.setWorkspaceId("default");
+    public void testAddUiElement() throws Exception {
+        UiElement uiElement = new UiElement();
+        uiElement.setName("test");
+        uiElement.setCreateUser("admin");
+        uiElement.setProjectId("1");
+        uiElement.setLocationType(LocationType.ID.getName());
+        uiElement.setLocation("kw");
+        uiElement.setModuleId("null");
 
-        var result = mockMvc.perform(MockMvcRequestBuilders.post("/project/add")
-                        .content(JSON.toJSONString(project))
+        var result = mockMvc.perform(MockMvcRequestBuilders.post("/ui_element/add")
+                        .content(JSON.toJSONString(uiElement))
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andReturn();
-        projectId = JsonPath.read(result.getResponse().getContentAsString(), "$.data.id");
+        elementId = JsonPath.read(result.getResponse().getContentAsString(), "$.data.id");
     }
 
     @Test
     @Order(2)
-    public void testEditProject() throws Exception {
-        Project project = new Project();
-        project.setId(projectId);
-        project.setName("test2");
-        project.setCreateUser("admin");
-        project.setWorkspaceId("default");
+    public void testEditUiElement() throws Exception {
+        UiElement uiElement = new UiElement();
+        uiElement.setId(elementId);
+        uiElement.setProjectId("1");
+        uiElement.setName("test");
+        uiElement.setCreateUser("admin");
+        uiElement.setLocationType(LocationType.ID.getName());
+        uiElement.setLocation("su");
+        uiElement.setModuleId("null");
 
-        mockMvc.perform(MockMvcRequestBuilders.post("/project/update")
-                        .content(JSON.toJSONString(project))
+        mockMvc.perform(MockMvcRequestBuilders.post("/ui_element/update")
+                        .content(JSON.toJSONString(uiElement))
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
@@ -66,11 +73,10 @@ public class ProjectControllerTests {
     @Test
     @Order(3)
     public void testSelectAll() throws Exception {
-        mockMvc.perform(MockMvcRequestBuilders.get("/project/list_all"))
+        mockMvc.perform(MockMvcRequestBuilders.get("/ui_element/list"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
 //                .andExpect(jsonPath("$.person.name").value("Jason"))
                 .andDo(print());
     }
-
 }
