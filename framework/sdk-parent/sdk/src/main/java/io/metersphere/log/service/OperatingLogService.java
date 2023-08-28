@@ -10,6 +10,7 @@ import io.metersphere.commons.utils.BeanUtils;
 import io.metersphere.commons.utils.JSON;
 import io.metersphere.i18n.Translator;
 import io.metersphere.log.constants.OperatorLevel;
+import io.metersphere.log.vo.DetailColumn;
 import io.metersphere.log.vo.OperatingLogDTO;
 import io.metersphere.log.vo.OperatingLogDetails;
 import io.metersphere.log.vo.OperatingLogRequest;
@@ -36,6 +37,9 @@ public class OperatingLogService {
     private BaseOperatingLogMapper baseOperatingLogMapper;
     @Resource
     private SqlSessionFactory sqlSessionFactory;
+
+    private static final String TIMING_SYNCHRONIZATION = "TIMING_SYNCHRONIZATION";
+    private static final String IMPORT_FILE = "IMPORT_FILE";
 
     public void create(OperatingLogWithBLOBs log, String sourceIds) {
         log.setSourceId(StringUtils.EMPTY);
@@ -128,10 +132,16 @@ public class OperatingLogService {
                 }
                 if (CollectionUtils.isEmpty(logWithBLOB.getDetails().getColumns())) {
                     dtos.add(logWithBLOB);
-                }
-                if (StringUtils.isBlank(logWithBLOB.getUserName()) && StringUtils.isNotBlank(logWithBLOB.getOperUser())) {
-                    logWithBLOB.setUserName(logWithBLOB.getOperUser());
-                }
+                } else {
+                    List<DetailColumn> columns = logWithBLOB.getDetails().getColumns();
+                    columns.stream().forEach(column -> {
+                        if (StringUtils.isNotEmpty(column.getColumnTitle())) {
+                            String columnsTitle = Translator.get(column.getColumnTitle());
+                            column.setColumnTitle(columnsTitle.replace("Not Support Key:", ""));
+                        }
+                    });
+                } 
+                setUserName(logWithBLOB);
             }
         }
         if (CollectionUtils.isNotEmpty(dtos)) {
@@ -139,4 +149,21 @@ public class OperatingLogService {
         }
         return logWithBLOBs;
     }
+
+    private static void setUserName(OperatingLogDTO logWithBLOB) {
+        if (StringUtils.isBlank(logWithBLOB.getUserName()) && StringUtils.isNotBlank(logWithBLOB.getOperUser())) {
+            if (logWithBLOB.getOperUser().contains(TIMING_SYNCHRONIZATION)) {
+                int suffix = logWithBLOB.getOperUser().indexOf(TIMING_SYNCHRONIZATION);
+                String substring = logWithBLOB.getOperUser().substring(0, suffix);
+                logWithBLOB.setUserName(substring + Translator.get("timing_synchronization"));
+            } else if (logWithBLOB.getOperUser().contains(IMPORT_FILE)) {
+                int suffix = logWithBLOB.getOperUser().indexOf(IMPORT_FILE);
+                String substring = logWithBLOB.getOperUser().substring(0, suffix);
+                logWithBLOB.setUserName(substring + Translator.get("import_file"));
+            } else {
+                logWithBLOB.setUserName(logWithBLOB.getOperUser());
+            }
+        }
+    }
+
 }

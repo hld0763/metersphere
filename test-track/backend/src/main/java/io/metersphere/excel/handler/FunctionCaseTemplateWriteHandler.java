@@ -3,6 +3,8 @@ package io.metersphere.excel.handler;
 import com.alibaba.excel.util.BooleanUtils;
 import com.alibaba.excel.write.handler.RowWriteHandler;
 import com.alibaba.excel.write.handler.context.RowWriteHandlerContext;
+import com.alibaba.excel.write.metadata.style.WriteCellStyle;
+import com.alibaba.excel.write.style.HorizontalCellStyleStrategy;
 import io.metersphere.commons.utils.JSON;
 import io.metersphere.excel.constants.TestCaseImportFiled;
 import io.metersphere.i18n.Translator;
@@ -34,6 +36,8 @@ public class FunctionCaseTemplateWriteHandler implements RowWriteHandler {
     private Integer priorityIndex;
     private Integer tagIndex;
     private Integer statusIndex;
+    private Integer stepDescIndex;
+    private Integer stepResultIndex;
     private Integer stepModelIndex;
 
     private Sheet sheet;
@@ -41,7 +45,7 @@ public class FunctionCaseTemplateWriteHandler implements RowWriteHandler {
 
     public FunctionCaseTemplateWriteHandler(boolean isNeedId, List<List<String>> headList, Map<String, List<String>> caseLevelAndStatusValueMap) {
         this.isNeedId = isNeedId;
-        this.initIndex(headList);
+        initIndex(headList);
         this.caseLevelAndStatusValueMap = caseLevelAndStatusValueMap;
     }
 
@@ -61,6 +65,10 @@ public class FunctionCaseTemplateWriteHandler implements RowWriteHandler {
                     tagIndex = index;
                 } else if (TestCaseImportFiled.STATUS.containsHead(head)) {
                     statusIndex = index;
+                } else if (TestCaseImportFiled.STEP_DESC.containsHead(head)) {
+                    stepDescIndex = index;
+                } else if (TestCaseImportFiled.STEP_RESULT.containsHead(head)) {
+                    stepResultIndex = index;
                 } else if (TestCaseImportFiled.STEP_MODEL.containsHead(head)) {
                     stepModelIndex = index;
                 }
@@ -83,6 +91,8 @@ public class FunctionCaseTemplateWriteHandler implements RowWriteHandler {
             setComment(moduleIndex, Translator.get("module_created_automatically"));
             setComment(maintainerIndex, Translator.get("please_input_project_member"));
             setComment(tagIndex, Translator.get("tag_tip_pattern"));
+            setComment(stepDescIndex, Translator.get("step_desc_tip"));
+            setComment(stepResultIndex, Translator.get("step_result_tip"));
             setComment(stepModelIndex, Translator.get("step_model_tip"));
 
             List<String> list = new ArrayList<>();
@@ -113,5 +123,12 @@ public class FunctionCaseTemplateWriteHandler implements RowWriteHandler {
         Comment comment = drawingPatriarch.createCellComment(new XSSFClientAnchor(0, 0, 0, 0, index, 0, index + 3, 1));
         comment.setString(new XSSFRichTextString(text));
         sheet.getRow(0).getCell(1).setCellComment(comment);
+    }
+
+    public static HorizontalCellStyleStrategy getHorizontalWrapStrategy() {
+        WriteCellStyle contentWriteCellStyle = new WriteCellStyle();
+        // 设置自动换行
+        contentWriteCellStyle.setWrapped(true);
+        return new HorizontalCellStyleStrategy(null, contentWriteCellStyle);
     }
 }

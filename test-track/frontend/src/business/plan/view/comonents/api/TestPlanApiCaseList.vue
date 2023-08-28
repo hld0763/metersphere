@@ -124,7 +124,7 @@
             :label="$t('commons.environment')"
           >
             <template v-slot:default="scope">
-              {{ scope.row.environmentName || "-" }}
+              {{ scope.row.environmentName || $t('api_test.environment.default_environment') }}
             </template>
           </ms-table-column>
 
@@ -222,6 +222,7 @@
         @handleRunBatch="handleRunBatch"
         ref="runMode"
         :plan-case-ids="testPlanCaseIds"
+        :plan-id="planId"
         :type="'apiCase'"
         @close="search"
       />
@@ -236,24 +237,14 @@ import MsTag from "metersphere-frontend/src/components/MsTag";
 import MsContainer from "metersphere-frontend/src/components/MsContainer";
 import MsBottomContainer from "metersphere-frontend/src/components/MsBottomContainer";
 import BatchEdit from "@/business/case/components/BatchEdit";
-import {
-  API_METHOD_COLOUR,
-  CASE_PRIORITY,
-  RESULT_MAP,
-} from "metersphere-frontend/src/model/JsonData";
-import {
-  getCurrentProjectID,
-  getCurrentWorkspaceId,
-} from "metersphere-frontend/src/utils/token";
-import {
-  hasLicense,
-  hasPermission,
-} from "metersphere-frontend/src/utils/permission";
-import { getUUID, strMapToObj } from "metersphere-frontend/src/utils";
+import {API_METHOD_COLOUR, CASE_PRIORITY, RESULT_MAP,} from "metersphere-frontend/src/model/JsonData";
+import {getCurrentProjectID,} from "metersphere-frontend/src/utils/token";
+import {hasLicense, hasPermission,} from "metersphere-frontend/src/utils/permission";
+import {getUUID, strMapToObj} from "metersphere-frontend/src/utils";
 import PriorityTableItem from "../../../../common/tableItems/planview/PriorityTableItem";
 import TestPlanCaseListHeader from "./TestPlanCaseListHeader";
 import TestPlanApiCaseResult from "./TestPlanApiCaseResult";
-import { TEST_PLAN_API_CASE } from "metersphere-frontend/src/utils/constants";
+import {TEST_PLAN_API_CASE} from "metersphere-frontend/src/utils/constants";
 import {
   buildBatchParam,
   deepClone,
@@ -267,16 +258,9 @@ import MsTable from "metersphere-frontend/src/components/table/MsTable";
 import MsTableColumn from "metersphere-frontend/src/components/table/MsTableColumn";
 import MsUpdateTimeColumn from "metersphere-frontend/src/components/table/MsUpdateTimeColumn";
 import MsCreateTimeColumn from "metersphere-frontend/src/components/table/MsCreateTimeColumn";
-import {
-  editTestPlanApiCaseOrder,
-  run,
-  testPlanAutoCheck,
-} from "@/api/remote/plan/test-plan";
-import { getProjectMemberUserFilter } from "@/api/user";
-import {
-  apiTestCaseGet,
-  apiTestCaseReduction,
-} from "@/api/remote/api/api-case";
+import {editTestPlanApiCaseOrder, run, testPlanAutoCheck,} from "@/api/remote/plan/test-plan";
+import {getProjectMemberUserFilter} from "@/api/user";
+import {apiTestCaseReduction,} from "@/api/remote/api/api-case";
 import {
   testPlanApiCaseBatchDelete,
   testPlanApiCaseBatchUpdateEnv,
@@ -286,9 +270,10 @@ import {
   testPlanApiCaseSelectAllTableRows,
 } from "@/api/remote/plan/test-plan-api-case";
 import MsTestPlanApiStatus from "@/business/plan/view/comonents/api/TestPlanApiStatus";
-import { getProjectVersions } from "@/business/utils/sdk-utils";
-import { TEST_PLAN_API_CASE_CONFIGS } from "metersphere-frontend/src/components/search/search-components";
+import {getProjectVersions} from "@/business/utils/sdk-utils";
+import {TEST_PLAN_API_CASE_CONFIGS} from "metersphere-frontend/src/components/search/search-components";
 import MsTestPlanRunModeWithEnv from "@/business/plan/common/TestPlanRunModeWithEnv";
+import {getProject} from "@/api/project";
 
 export default {
   name: "TestPlanApiCaseList",
@@ -742,19 +727,25 @@ export default {
       }
     },
     openApiById(item) {
-      let definitionData = this.$router.resolve(
-        "/api/definition/default/" +
-          getUUID() +
-          "/apiTestCase/single:" +
-          item.caseId +
-          "/" +
-          getCurrentProjectID() +
-          "/" +
-          item.protocol +
-          "/" +
-          getCurrentWorkspaceId()
-      );
-      window.open(definitionData.href, "_blank");
+      let projectId = item.projectId;
+      getProject(projectId).then((rsp) => {
+        if (rsp.data) {
+          let workspaceId = rsp.data.workspaceId;
+          let definitionData = this.$router.resolve(
+              "/api/definition/default/" +
+              getUUID() +
+              "/apiTestCase/single:" +
+              item.caseId +
+              "/" +
+              projectId +
+              "/" +
+              item.protocol +
+              "/" +
+              workspaceId
+          );
+          window.open(definitionData.href, "_blank");
+        }
+      });
     },
     getTagToolTips(tags) {
       try {

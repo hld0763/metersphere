@@ -18,6 +18,7 @@ import io.metersphere.commons.utils.Pager;
 import io.metersphere.dto.MsExecResponseDTO;
 import io.metersphere.dto.RunModeConfigDTO;
 import io.metersphere.log.annotation.MsAuditLog;
+import io.metersphere.log.annotation.MsRequestLog;
 import io.metersphere.request.ResetOrderRequest;
 import io.metersphere.service.plan.TestPlanApiCaseService;
 import jakarta.annotation.Resource;
@@ -84,6 +85,7 @@ public class TestPlanApiCaseController {
     }
 
     @PostMapping("/relevance/{planId}")
+    @MsRequestLog(module = OperLogModule.TRACK_TEST_PLAN)
     public void testPlanRelevance(@RequestBody List<String> ids, @PathVariable("planId") String planId) {
         testPlanApiCaseService.relevanceByTestIds(ids, planId);
     }
@@ -94,6 +96,7 @@ public class TestPlanApiCaseController {
     }
 
     @GetMapping("/plan/copy/{sourcePlanId}/{targetPlanId}")
+    @MsRequestLog(module = OperLogModule.TRACK_TEST_PLAN)
     public void getStatusByTestPlanId(@PathVariable("sourcePlanId") String sourcePlanId, @PathVariable("targetPlanId") String targetPlanId) {
         testPlanApiCaseService.copyPlan(sourcePlanId, targetPlanId);
     }
@@ -125,12 +128,12 @@ public class TestPlanApiCaseController {
     }
 
     @PostMapping(value = "/run")
-    @MsAuditLog(module = OperLogModule.TRACK_TEST_PLAN, type = OperLogConstants.EXECUTE, content = "#msClass.getLogDetails(#request.planIds)", msClass = TestPlanApiCaseService.class)
     public List<MsExecResponseDTO> run(@RequestBody BatchRunDefinitionRequest request) {
         return testPlanApiCaseService.run(request);
     }
 
     @PostMapping("/edit/order")
+    @MsRequestLog(module = OperLogModule.TRACK_TEST_PLAN)
     public void orderCase(@RequestBody ResetOrderRequest request) {
         testPlanApiCaseService.updateOrder(request);
     }
@@ -182,10 +185,11 @@ public class TestPlanApiCaseController {
 
     @PostMapping("/list/module/{planId}/{protocol}")
     public List<ApiModuleDTO> getNodeByPlanId(@PathVariable String planId, @PathVariable String protocol, @RequestBody List<String> projectIds) {
-        return testPlanApiCaseService.getNodeByPlanId(projectIds, planId, protocol);
+        return testPlanApiCaseService.getNodeByPlanId(planId, protocol);
     }
 
     @GetMapping("/run/{testId}/{reportId}")
+    @MsRequestLog(module = OperLogModule.TRACK_TEST_PLAN)
     public void runApi(@PathVariable String testId, @PathVariable String reportId) {
         testPlanApiCaseService.run(testId, reportId);
     }

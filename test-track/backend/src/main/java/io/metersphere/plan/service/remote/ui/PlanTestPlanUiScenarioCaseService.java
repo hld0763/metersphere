@@ -6,6 +6,7 @@ import io.metersphere.base.domain.UiScenarioReportWithBLOBs;
 import io.metersphere.commons.constants.MicroServiceName;
 import io.metersphere.commons.exception.MSException;
 import io.metersphere.commons.utils.LogUtil;
+import io.metersphere.commons.utils.SubListUtil;
 import io.metersphere.dto.*;
 import io.metersphere.plan.constant.ApiReportStatus;
 import io.metersphere.plan.dto.*;
@@ -158,7 +159,13 @@ public class PlanTestPlanUiScenarioCaseService extends UiTestService {
         if (CollectionUtils.isEmpty(uiCases)) {
             return null;
         }
-        return microService.postForDataArray(serviceName, BASE_URL + "/build/response", uiCases, TestPlanUiScenarioDTO.class);
+
+        //分批处理参数时为了不影响初始参数，这里使用新的对象进行处理
+        List<TestPlanUiScenarioDTO> returnList = new ArrayList<>();
+        SubListUtil.dealForSubList(uiCases, 20, list -> {
+            returnList.addAll(microService.postForDataArray(serviceName, BASE_URL + "/build/response", list, TestPlanUiScenarioDTO.class));
+        });
+        return returnList;
     }
 
     public Object relevanceList(ApiScenarioRequest request, int pageNum, int pageSize) {
@@ -184,6 +191,10 @@ public class PlanTestPlanUiScenarioCaseService extends UiTestService {
 
     public List<String> getUiScenarioProjectIds(String planId) {
         return microService.getForData(serviceName, BASE_URL + "/get/project/ids/" + planId, List.class);
+    }
+
+    public List<String> getUiScenarioEnvProjectIds(String planId) {
+        return microService.getForData(serviceName, BASE_URL + "/get/env-project-ids/" + planId, List.class);
     }
 
     public RunModeConfigDTO setScenarioEnv(String planId, RunModeConfigDTO runModeConfig) {

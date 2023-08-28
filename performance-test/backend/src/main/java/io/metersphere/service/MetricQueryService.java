@@ -7,6 +7,7 @@ import io.metersphere.base.mapper.LoadTestReportMapper;
 import io.metersphere.base.mapper.ext.ExtLoadTestReportMapper;
 import io.metersphere.commons.constants.ParamConstants;
 import io.metersphere.commons.exception.MSException;
+import io.metersphere.commons.utils.CodingUtil;
 import io.metersphere.commons.utils.DateUtils;
 import io.metersphere.commons.utils.JSON;
 import io.metersphere.commons.utils.LogUtil;
@@ -14,13 +15,18 @@ import io.metersphere.dto.*;
 import io.metersphere.request.MetricDataRequest;
 import io.metersphere.request.MetricQuery;
 import io.metersphere.request.MetricRequest;
+import jakarta.annotation.Resource;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
-import jakarta.annotation.Resource;
+import java.net.URL;
 import java.text.DecimalFormat;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -81,8 +87,28 @@ public class MetricQueryService {
         String start = df.format(startTime / 1000.0);
         String end = df.format(endTime / 1000.0);
         try {
-            Map response = restTemplate.getForObject(prometheusHost + "/api/v1/query_range?query={promQL}&start={start}&end={end}&step={step}", Map.class, promQL, start, end, step);
-            LogUtil.info(prometheusHost + "/api/v1/query_range?query={" + promQL + "}&start={" + start + "}&end{" + end + "}&step={" + step + "}");
+            // prometheusHost 不再变更
+            String host = prometheusHost;
+            HttpHeaders headers = new HttpHeaders();
+            headers.add("Content-Type", "application/x-www-form-urlencoded");
+            // 如果prometheus开启了认证，需要在请求头中添加认证信息
+            if (host.contains("@")) {
+                URL url = new URL(host);
+                // 获取认证信息部分
+                String userInfo = url.getUserInfo();
+                headers.add("Authorization", "Basic " + CodingUtil.base64Encoding(userInfo));
+                host = host.replace(userInfo + "@", "");
+            }
+            LogUtil.debug(host + "/api/v1/query_range?query=" + promQL + "&start=" + start + "&end" + end + "&step=" + step);
+            // 设置请求参数
+            MultiValueMap<String, Object> postParameters = new LinkedMultiValueMap<>();
+            postParameters.add("query", promQL);
+            postParameters.add("start", start);
+            postParameters.add("end", end);
+            postParameters.add("step", step);
+            HttpEntity<MultiValueMap<String, Object>> httpEntity = new HttpEntity<>(postParameters, headers);
+
+            Map response = restTemplate.postForObject(host + "/api/v1/query_range", httpEntity, Map.class);
             metricData = handleResult(seriesName, response, instance);
         } catch (Exception e) {
             LogUtil.error("query prometheus metric fail.");
@@ -126,13 +152,7 @@ public class MetricQueryService {
                 List jsonArray = (List) resultObject.get("values");
                 jsonArray.forEach(value -> {
                     List ja = JSON.parseArray(value.toString());
-                    double timestamp = (double) ja.get(0);
-                    try {
-                        timestamps.add(DateUtils.getTimeString((long) (timestamp * 1000)));
-                    } catch (Exception e) {
-                        LogUtil.error(e.getMessage(), e);
-                        LogUtil.error(e);
-                    }
+                    timestamps.add(DateUtils.getTimeString((long) (Double.parseDouble(ja.get(0).toString()) * 1000)));
                     values.add(Double.valueOf(ja.get(1).toString()));
                 });
 

@@ -13,6 +13,8 @@ import io.metersphere.api.dto.definition.*;
 import io.metersphere.api.dto.plan.AutomationsRunInfoDTO;
 import io.metersphere.api.dto.plan.TestPlanApiCaseBatchRequest;
 import io.metersphere.api.dto.plan.TestPlanApiCaseInfoDTO;
+import io.metersphere.api.dto.scenario.DatabaseConfig;
+import io.metersphere.api.dto.scenario.environment.EnvironmentConfig;
 import io.metersphere.api.exec.api.ApiCaseExecuteService;
 import io.metersphere.api.exec.api.ApiExecuteService;
 import io.metersphere.api.jmeter.JMeterService;
@@ -30,15 +32,14 @@ import io.metersphere.commons.utils.*;
 import io.metersphere.dto.MsExecResponseDTO;
 import io.metersphere.dto.RunModeConfigDTO;
 import io.metersphere.environment.service.BaseEnvGroupProjectService;
+import io.metersphere.environment.service.BaseEnvironmentService;
 import io.metersphere.log.vo.OperatingLogDetails;
 import io.metersphere.request.OrderRequest;
 import io.metersphere.request.ResetOrderRequest;
 import io.metersphere.service.BaseProjectService;
+import io.metersphere.service.RedisTemplateService;
 import io.metersphere.service.ServiceUtils;
-import io.metersphere.service.definition.ApiDefinitionExecResultService;
-import io.metersphere.service.definition.ApiDefinitionService;
-import io.metersphere.service.definition.ApiModuleService;
-import io.metersphere.service.definition.ApiTestCaseService;
+import io.metersphere.service.definition.*;
 import io.metersphere.service.plan.remote.TestPlanService;
 import jakarta.annotation.Resource;
 import org.apache.commons.collections.MapUtils;
@@ -46,6 +47,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.ibatis.session.ExecutorType;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
+import org.json.JSONObject;
 import org.mybatis.spring.SqlSessionUtils;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -96,6 +98,12 @@ public class TestPlanApiCaseService {
     private JMeterService jMeterService;
     @Resource
     private ApiScenarioReportMapper apiScenarioReportMapper;
+    @Resource
+    private ApiCaseResultService apiCaseResultService;
+    @Resource
+    private RedisTemplateService redisTemplateService;
+    @Resource
+    private BaseEnvironmentService baseEnvironmentService;
 
     public List<TestPlanApiCaseDTO> list(ApiTestCaseRequest request) {
         request.setProjectId(null);
@@ -683,7 +691,7 @@ public class TestPlanApiCaseService {
 
     public Map<String, List<String>> getApiCaseEnv(List<String> planApiCaseIds) {
         Map<String, List<String>> envMap = new HashMap<>();
-        if (org.apache.commons.collections.CollectionUtils.isEmpty(planApiCaseIds)) {
+        if (CollectionUtils.isEmpty(planApiCaseIds)) {
             return envMap;
         }
 
@@ -691,7 +699,7 @@ public class TestPlanApiCaseService {
         caseExample.createCriteria().andIdIn(planApiCaseIds);
         List<TestPlanApiCase> testPlanApiCases = testPlanApiCaseMapper.selectByExample(caseExample);
         List<String> apiCaseIds = testPlanApiCases.stream().map(TestPlanApiCase::getApiCaseId).collect(Collectors.toList());
-        if (org.apache.commons.collections.CollectionUtils.isEmpty(apiCaseIds)) {
+        if (CollectionUtils.isEmpty(apiCaseIds)) {
             return envMap;
         }
 
@@ -705,7 +713,7 @@ public class TestPlanApiCaseService {
             String caseId = testPlanApiCase.getApiCaseId();
             String envId = testPlanApiCase.getEnvironmentId();
             String projectId = projectCaseIdMap.get(caseId);
-            if (StringUtils.isNotBlank(projectId) && StringUtils.isNotBlank(envId)) {
+            if (StringUtils.isNotBlank(projectId)) {
                 if (envMap.containsKey(projectId)) {
                     List<String> list = envMap.get(projectId);
                     if (!list.contains(envId)) {
@@ -713,7 +721,9 @@ public class TestPlanApiCaseService {
                     }
                 } else {
                     List<String> envs = new ArrayList<>();
-                    envs.add(envId);
+                    if (StringUtils.isNotBlank(envId)) {
+                        envs.add(envId);
+                    }
                     envMap.put(projectId, envs);
                 }
             }
@@ -731,9 +741,10 @@ public class TestPlanApiCaseService {
         return buildCases(extTestPlanApiCaseMapper.getFailureListByIds(planApiCaseIds, null));
     }
 
-    public List<ApiModuleDTO> getNodeByPlanId(List<String> projectIds, String planId, String protocol) {
+    public List<ApiModuleDTO> getNodeByPlanId(String planId, String protocol) {
         List<ApiModuleDTO> list = new ArrayList<>();
-        projectIds.forEach(id -> {
+        List<String> apiCaseProjectId = extTestPlanApiCaseMapper.getCaseProjectIdByPlanId(planId);
+        apiCaseProjectId.forEach(id -> {
             Project project = baseProjectService.getProjectById(id);
             String name = project.getName();
             List<ApiModuleDTO> nodeList = getNodeDTO(id, planId, protocol);
@@ -774,6 +785,36 @@ public class TestPlanApiCaseService {
         return nodeTrees;
     }
 
+    public Map<String, String> getEnvMap(JSONObject request, String projectId) {
+        Map<String, String> projectEnvMap = new HashMap<>();
+        if (!request.has(PropertyConstant.TYPE)) {
+            return projectEnvMap;
+        }
+        if (StringUtils.equals(ElementConstants.HTTP_SAMPLER, request.optString(PropertyConstant.TYPE))) {
+            if (StringUtils.isNotEmpty(request.optString(PropertyConstant.ENVIRONMENT))) {
+                //记录运行环境ID
+                projectEnvMap.put(projectId, request.optString(PropertyConstant.ENVIRONMENT));
+            }
+        }
+        if (StringUtils.equals(ElementConstants.JDBC_SAMPLER, request.optString(PropertyConstant.TYPE))) {
+            if (request.has(PropertyConstant.ENVIRONMENT) && request.has(PropertyConstant.DATASOURCE_ID)) {
+                ApiTestEnvironmentWithBLOBs environment = baseEnvironmentService.get(request.optString(PropertyConstant.ENVIRONMENT));
+                if (environment != null && environment.getConfig() != null) {
+                    EnvironmentConfig envConfig = JSON.parseObject(environment.getConfig(), EnvironmentConfig.class);
+                    if (org.apache.commons.collections.CollectionUtils.isNotEmpty(envConfig.getDatabaseConfigs())) {
+                        for (DatabaseConfig item : envConfig.getDatabaseConfigs()) {
+                            if (StringUtils.equals(item.getId(), request.optString(PropertyConstant.DATASOURCE_ID))) {
+                                //记录运行环境ID
+                                projectEnvMap.put(projectId, request.optString(PropertyConstant.ENVIRONMENT));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return projectEnvMap;
+    }
+
     public void run(String testId, String reportId) {
         TestPlanApiCase testPlanApiCase = testPlanApiCaseMapper.selectByPrimaryKey(testId);
         if (testPlanApiCase == null) {
@@ -783,7 +824,6 @@ public class TestPlanApiCaseService {
         if (apiCase == null) {
             MSException.throwException("用例已经被删除");
         }
-
         String reportName = apiCase.getName();
         ApiDefinitionExecResultWithBLOBs result = ApiDefinitionExecResultUtil.add(testId, ApiReportStatus.RUNNING.name(), reportId, Objects.requireNonNull(SessionUtils.getUser()).getId());
         result.setName(reportName);
@@ -795,11 +835,14 @@ public class TestPlanApiCaseService {
             runModeConfigDTO.setEnvMap(new HashMap<>() {{
                 this.put(result.getProjectId(), testPlanApiCase.getEnvironmentId());
             }});
-            runModeConfigDTO.setResourcePoolId(runModeConfigDTO.getResourcePoolId());
-            result.setEnvConfig(JSON.toJSONString(runModeConfigDTO));
+        } else {
+            JSONObject jsonObject = new JSONObject(apiCase.getRequest());
+            runModeConfigDTO.setEnvMap(this.getEnvMap(jsonObject, apiCase.getProjectId()));
         }
+        runModeConfigDTO.setResourcePoolId(runModeConfigDTO.getResourcePoolId());
+        result.setEnvConfig(JSON.toJSONString(runModeConfigDTO));
         result.setActuator(runModeConfigDTO.getResourcePoolId());
-        apiDefinitionExecResultMapper.insert(result);
+        apiCaseResultService.batchSave(result);
         apiCase.setId(testId);
 
         RunCaseRequest request = new RunCaseRequest();
@@ -812,6 +855,8 @@ public class TestPlanApiCaseService {
         request.setTestPlanId(testPlanApiCase.getTestPlanId());
         Map<String, Object> extendedParameters = new HashMap<>();
         extendedParameters.put(ExtendedParameter.SYNC_STATUS, true);
+
+        redisTemplateService.lock(testId, reportId);
         apiExecuteService.exec(request, extendedParameters);
     }
 

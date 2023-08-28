@@ -1,21 +1,21 @@
 <template>
   <el-container>
     <ms-aside-container
-      width="500px"
-      :default-hidden-bottom-top="200"
-      :enable-auto-height="true"
+        width="500px"
+        :default-hidden-bottom-top="200"
+        :enable-auto-height="true"
     >
       <el-card>
         <el-scrollbar>
           <ms-table
-            v-loading="loading"
-            :show-select-all="false"
-            :screen-height="null"
-            :enable-selection="false"
-            :highlight-current-row="true"
-            @refresh="getScenarioApiCase"
-            @handleRowClick="rowClick"
-            :data="apiCases"
+              v-loading="loading"
+              :show-select-all="false"
+              :screen-height="null"
+              :enable-selection="false"
+              :highlight-current-row="true"
+              @refresh="getScenarioApiCase"
+              @handleRowClick="rowClick"
+              :data="apiCases"
           >
             <ms-table-column :width="100" :label="$t('commons.id')" prop="num">
             </ms-table-column>
@@ -24,30 +24,30 @@
             </ms-table-column>
 
             <el-table-column
-              prop="principalName"
-              :label="$t('test_track.plan.plan_principal')"
+                prop="principalName"
+                :label="$t('test_track.plan.plan_principal')"
             />
 
             <ms-table-column
-              :label="$t('test_track.case.priority')"
-              :width="80"
-              prop="priority"
+                :label="$t('test_track.case.priority')"
+                :width="80"
+                prop="priority"
             >
               <template v-slot:default="scope">
                 <priority-table-item
-                  :value="scope.row.priority"
-                  ref="priority"
+                    :value="scope.row.priority"
+                    ref="priority"
                 />
               </template>
             </ms-table-column>
 
             <ms-table-column
-              :width="80"
-              :label="$t('test_track.plan_view.execute_result')"
-              prop="lastResult"
+                :width="80"
+                :label="$t('test_track.plan_view.execute_result')"
+                prop="lastResult"
             >
               <template v-slot:default="scope">
-                <ms-test-plan-api-status :status="scope.row.execResult" />
+                <ms-test-plan-api-status :status="scope.row['execResult']"/>
               </template>
             </ms-table-column>
           </ms-table>
@@ -57,13 +57,13 @@
     <ms-main-container v-loading="responseLoading">
       <div v-if="showResponse">
         <el-card v-if="!isTemplate">
-          <ms-request-result-tail :response="response" ref="showRspResult" />
+          <ms-request-result-tail :response="response" :is-test-plan="true" ref="showRspResult"/>
         </el-card>
         <el-card v-else>
           <ms-request-result-tail
-            :response="response"
-            :is-test-plan="showResponse"
-            ref="debugResult"
+              :response="response"
+              :is-test-plan="showResponse"
+              ref="debugResult"
           />
         </el-card>
       </div>
@@ -96,11 +96,8 @@ import MsTable from "metersphere-frontend/src/components/table/MsTable";
 import MsTableColumn from "metersphere-frontend/src/components/table/MsTableColumn";
 import MsAsideContainer from "metersphere-frontend/src/components/MsAsideContainer";
 import MsMainContainer from "metersphere-frontend/src/components/MsMainContainer";
-import { getShareApiReport, getShareApiReportByReportId } from "@/api/share";
-import {
-  apiDefinitionReportGet,
-  apiDefinitionReportGetDb,
-} from "@/api/remote/api/api-definition";
+import {getShareApiReport, getShareApiReportByReportId} from "@/api/share";
+import {apiDefinitionReportGet, apiDefinitionReportGetDb,} from "@/api/remote/api/api-definition";
 import MsTestPlanApiStatus from "@/business/plan/view/comonents/api/TestPlanApiStatus";
 
 export default {
@@ -153,30 +150,30 @@ export default {
     getScenarioApiCase() {
       if (this.isTemplate || this.isDb) {
         if (this.isErrorReport) {
-          this.apiCases = this.report.errorReportCases
-            ? this.report.errorReportCases
-            : [];
+          this.apiCases = this.report['errorReportCases']
+              ? this.report['errorReportCases']
+              : [];
         } else if (this.isUnExecute) {
-          this.apiCases = this.report.unExecuteCases
-            ? this.report.unExecuteCases
-            : [];
+          this.apiCases = this.report['unExecuteCases']
+              ? this.report['unExecuteCases']
+              : [];
         } else if (this.isAll) {
-          this.apiCases = this.report.apiAllCases
-            ? this.report.apiAllCases
-            : [];
+          this.apiCases = this.report['apiAllCases']
+              ? this.report['apiAllCases']
+              : [];
         } else {
-          this.apiCases = this.report.apiFailureCases
-            ? this.report.apiFailureCases
-            : [];
+          this.apiCases = this.report['apiFailureCases']
+              ? this.report['apiFailureCases']
+              : [];
         }
       } else if (this.isShare) {
         if (this.isErrorReport) {
           this.loading = true;
           getSharePlanApiErrorReportCase(this.shareId, this.planId).then(
-            (r) => {
-              this.loading = false;
-              this.apiCases = r.data;
-            }
+              (r) => {
+                this.loading = false;
+                this.apiCases = r.data;
+              }
           );
         } else if (this.isUnExecute) {
           this.loading = true;
@@ -311,14 +308,10 @@ export default {
   height: 550px;
 }
 
-:deep(.text-container .pane) {
-  height: 550px !important;
-}
-
 .ms-aside-container {
-  border: 0px;
+  border: 0;
   height: 550px;
-  padding: 10px 0px 0px 10px;
+  padding: 10px 0 0 10px;
 }
 
 .ms-main-container {

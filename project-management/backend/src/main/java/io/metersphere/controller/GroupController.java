@@ -4,28 +4,33 @@ import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import io.metersphere.base.domain.Group;
 import io.metersphere.base.domain.User;
+import io.metersphere.base.domain.UserGroup;
 import io.metersphere.base.domain.Workspace;
 import io.metersphere.commons.constants.OperLogConstants;
 import io.metersphere.commons.constants.OperLogModule;
 import io.metersphere.commons.constants.PermissionConstants;
+import io.metersphere.commons.constants.UserGroupConstants;
+import io.metersphere.commons.user.SessionUser;
 import io.metersphere.commons.utils.PageUtils;
 import io.metersphere.commons.utils.Pager;
 import io.metersphere.commons.utils.SessionUtils;
 import io.metersphere.dto.GroupDTO;
 import io.metersphere.dto.GroupPermissionDTO;
 import io.metersphere.log.annotation.MsAuditLog;
+import io.metersphere.log.annotation.MsRequestLog;
 import io.metersphere.request.GroupRequest;
 import io.metersphere.request.group.EditGroupRequest;
 import io.metersphere.request.group.EditGroupUserRequest;
 import io.metersphere.service.GroupService;
+import jakarta.annotation.Resource;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.shiro.authz.annotation.Logical;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.annotation.Resource;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 
@@ -46,6 +51,13 @@ public class GroupController {
 
     @GetMapping("/get/all")
     public List<GroupDTO> getAllGroup() {
+        SessionUser user = SessionUtils.getUser();
+        Optional<UserGroup> any = user.getUserGroups().stream()
+                .filter(ug -> (ug.getGroupId().equals(UserGroupConstants.SUPER_GROUP)))
+                .findAny();
+        if (any.isEmpty()) {
+            return new ArrayList<>();
+        }
         return groupService.getAllGroup();
     }
 
@@ -84,13 +96,9 @@ public class GroupController {
 
     @PostMapping("/permission/edit")
     @RequiresPermissions(value = {PermissionConstants.SYSTEM_GROUP_READ_SETTING_PERMISSION, PermissionConstants.PROJECT_GROUP_READ_SETTING_PERMISSION}, logical = Logical.OR)
+    @MsRequestLog(module = OperLogModule.GROUP_PERMISSION)
     public void editGroupPermission(@RequestBody EditGroupRequest editGroupRequest) {
         groupService.editGroupPermission(editGroupRequest);
-    }
-
-    @GetMapping("/all/{userId}")
-    public List<Map<String, Object>> getAllUserGroup(@PathVariable("userId") String userId) {
-        return groupService.getAllUserGroup(userId);
     }
 
     @PostMapping("/list")
@@ -140,11 +148,14 @@ public class GroupController {
     }
 
     @PostMapping("/add/member")
+    @MsRequestLog(module = OperLogModule.GROUP_PERMISSION)
     public void addGroupUser(@RequestBody EditGroupUserRequest request) {
         groupService.addGroupUser(request);
     }
 
     @PostMapping("/edit/member")
+    @MsRequestLog(module = OperLogModule.GROUP_PERMISSION)
+    @RequiresPermissions(value = {PermissionConstants.SYSTEM_GROUP_READ_EDIT, PermissionConstants.PROJECT_GROUP_READ_EDIT}, logical = Logical.OR)
     public void editGroupUser(@RequestBody EditGroupUserRequest request) {
         groupService.editGroupUser(request);
     }

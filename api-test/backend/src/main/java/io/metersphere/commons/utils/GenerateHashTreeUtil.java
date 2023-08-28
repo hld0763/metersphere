@@ -4,9 +4,11 @@ package io.metersphere.commons.utils;
 import io.metersphere.api.dto.EnvironmentType;
 import io.metersphere.api.dto.definition.request.*;
 import io.metersphere.api.dto.definition.request.variable.ScenarioVariable;
+import io.metersphere.api.dto.scenario.environment.EnvironmentConfig;
 import io.metersphere.api.jmeter.NewDriverManager;
 import io.metersphere.api.jmeter.ResourcePoolCalculation;
 import io.metersphere.base.domain.ApiScenarioWithBLOBs;
+import io.metersphere.base.domain.ApiTestEnvironmentWithBLOBs;
 import io.metersphere.base.domain.TestResource;
 import io.metersphere.base.domain.TestResourcePool;
 import io.metersphere.base.mapper.TestResourcePoolMapper;
@@ -19,6 +21,7 @@ import io.metersphere.dto.JmeterRunRequestDTO;
 import io.metersphere.dto.ProjectJarConfig;
 import io.metersphere.dto.RunModeConfigDTO;
 import io.metersphere.environment.service.BaseEnvGroupProjectService;
+import io.metersphere.environment.service.BaseEnvironmentService;
 import io.metersphere.plugin.core.MsTestElement;
 import io.metersphere.utils.LoggerUtil;
 import io.metersphere.vo.BooleanPool;
@@ -27,10 +30,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.jorphan.collections.HashTree;
 import org.json.JSONObject;
 
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class GenerateHashTreeUtil {
     public static MsScenario parseScenarioDefinition(String scenarioDefinition) {
@@ -49,10 +49,10 @@ public class GenerateHashTreeUtil {
             JSONObject element = JSONUtil.parseObject(scenarioDefinition);
             ElementUtil.dataFormatting(element);
             // 多态JSON普通转换会丢失内容，需要通过 ObjectMapper 获取
-            if (element != null && element.has(ElementConstants.HASH_TREE)) {
+            if (element.has(ElementConstants.HASH_TREE)) {
                 scenario.setHashTree(JSONUtil.readValue(element.optJSONArray(ElementConstants.HASH_TREE).toString()));
             }
-            if (element != null && StringUtils.isNotEmpty(element.optString("variables"))) {
+            if (StringUtils.isNotEmpty(element.optString("variables"))) {
                 scenario.setVariables(JSONUtil.parseArray(element.optString("variables"), ScenarioVariable.class));
             }
         } catch (Exception e) {
@@ -62,7 +62,7 @@ public class GenerateHashTreeUtil {
 
     public static LinkedList<MsTestElement> getScenarioHashTree(String definition) {
         JSONObject element = JSONUtil.parseObject(definition);
-        if (element != null && element.has(ElementConstants.HASH_TREE)) {
+        if (element.has(ElementConstants.HASH_TREE)) {
             ElementUtil.dataFormatting(element);
             return JSONUtil.readValue(element.optJSONArray(ElementConstants.HASH_TREE).toString());
         }
@@ -153,9 +153,10 @@ public class GenerateHashTreeUtil {
             group.setHashTree(scenarios);
             testPlan.getHashTree().add(group);
 
-            ParameterConfig config = new ParameterConfig();
+            ParameterConfig config = new ParameterConfig(item.getProjectId(), false);
             config.setScenarioId(item.getId());
             config.setReportType(runRequest.getReportType());
+            config.setConfig(getEnv(scenario.getEnvironmentMap()));
             if (runRequest.isRetryEnable() && runRequest.getRetryNum() > 0) {
                 config.setRetryNum(runRequest.getRetryNum());
             }
@@ -172,6 +173,22 @@ public class GenerateHashTreeUtil {
         return jmeterHashTree;
     }
 
+    public static Map<String, EnvironmentConfig> getEnv(Map<String, String> environmentMap) {
+        Map<String, EnvironmentConfig> envConfig = new HashMap<>();
+        if(MapUtils.isEmpty(environmentMap)){
+            return envConfig;
+        }
+        for (String projectId : environmentMap.keySet()) {
+            BaseEnvironmentService apiTestEnvironmentService = CommonBeanFactory.getBean(BaseEnvironmentService.class);
+            ApiTestEnvironmentWithBLOBs environment = apiTestEnvironmentService.get(environmentMap.get(projectId));
+            if (environment != null && StringUtils.isNotEmpty(environment.getConfig())) {
+                EnvironmentConfig env = JSONUtil.parseObject(environment.getConfig(), EnvironmentConfig.class);
+                env.setEnvironmentId(environment.getId());
+                envConfig.put(projectId, env);
+            }
+        }
+        return envConfig;
+    }
     public static boolean isSetReport(RunModeConfigDTO config) {
         return config != null && isSetReport(config.getReportType()) && StringUtils.isNotEmpty(config.getReportName());
     }

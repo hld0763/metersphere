@@ -3,11 +3,10 @@
     destroy-on-close
     :title="$t('load_test.runtime_config')"
     width="550px"
-    style="margin-top: -8.65vh; max-height: 87.3vh"
     @close="close"
     :visible.sync="runModeVisible"
   >
-    <div class="env-container" style="max-height: 400px; overflow: auto">
+    <div class="env-container">
       <div>
         <div>{{ $t("commons.environment") }}：</div>
         <env-select-popover
@@ -16,6 +15,7 @@
           :project-env-map="projectEnvListMap"
           :environment-type.sync="runConfig.environmentType"
           :has-option-group="true"
+          :is-env-saved="isEnvSaved"
           :group-id="runConfig.environmentGroupId"
           @setProjectEnvMap="setProjectEnvMap"
           @setDefaultEnv="setDefaultEnv"
@@ -59,25 +59,10 @@
       <div>
         <div class="mode-row">{{ $t("run_mode.other_config") }}：</div>
         <div>
-          <!-- 串行 -->
-          <div
-            class="mode-row"
-            v-if="
-              runConfig.mode === 'serial' &&
-              testType === 'API' &&
-              haveOtherExecCase
-            "
-          >
-            <el-checkbox
-              v-model="runConfig.runWithinResourcePool"
-              style="padding-right: 10px"
-              class="radio-change"
-              :disabled="runMode === 'POOL'"
-            >
-              {{ $t("run_mode.run_with_resource_pool") }} </el-checkbox
-            ><br />
+          <!-- 资源池 -->
+          <div class="mode-row" v-if="testType === 'API' && haveOtherExecCase">
+            <span>{{ $t("run_mode.run_with_resource_pool") }}: </span>
             <el-select
-              :disabled="!runConfig.runWithinResourcePool"
               v-model="runConfig.resourcePoolId"
               size="mini"
               style="width: 100%; margin-top: 8px"
@@ -86,39 +71,6 @@
                 v-for="item in resourcePools"
                 :key="item.id"
                 :label="item.name"
-                :value="item.id"
-              >
-              </el-option>
-            </el-select>
-          </div>
-          <!-- 并行 -->
-          <div
-            class="mode-row"
-            v-if="
-              runConfig.mode === 'parallel' &&
-              testType === 'API' &&
-              haveOtherExecCase
-            "
-          >
-            <el-checkbox
-              v-model="runConfig.runWithinResourcePool"
-              style="padding-right: 10px"
-              class="radio-change"
-              :disabled="runMode === 'POOL'"
-            >
-              {{ $t("run_mode.run_with_resource_pool") }} </el-checkbox
-            ><br />
-            <el-select
-              :disabled="!runConfig.runWithinResourcePool"
-              v-model="runConfig.resourcePoolId"
-              size="mini"
-              style="width: 100%; margin-top: 8px"
-            >
-              <el-option
-                v-for="item in resourcePools"
-                :key="item.id"
-                :label="item.name"
-                :disabled="!item.api"
                 :value="item.id"
               >
               </el-option>
@@ -221,7 +173,6 @@ import {
 import EnvGroupWithOption from "../env/EnvGroupWithOption";
 import EnvironmentGroup from "@/business/plan/env/EnvironmentGroupList";
 import EnvSelectPopover from "@/business/plan/env/EnvSelectPopover";
-import { getSystemBaseSetting } from "metersphere-frontend/src/api/system";
 import { getProjectConfig } from "@/api/project";
 
 export default {
@@ -241,7 +192,6 @@ export default {
   },
   data() {
     return {
-      runMode: "",
       btnStyle: {
         width: "260px",
       },
@@ -255,7 +205,6 @@ export default {
         mode: "serial",
         reportType: "iddReport",
         onSampleError: false,
-        runWithinResourcePool: false,
         resourcePoolId: null,
         envMap: new Map(),
         environmentGroupId: "",
@@ -267,6 +216,8 @@ export default {
       },
       projectList: [],
       projectIds: new Set(),
+      //环境是否保存过。未保存过的话展示的是”用例环境“
+      isEnvSaved: true,
       options: [
         {
           value: "confirmAndRun",
@@ -305,6 +256,7 @@ export default {
       type: Boolean,
       default: false,
     },
+    //是否有其他用例（性能测试除外）
     haveOtherExecCase: {
       type: Boolean,
       default: true,
@@ -313,45 +265,58 @@ export default {
   methods: {
     open(testType, runModeConfig) {
       this.defaultEnvMap = {};
-      if (runModeConfig) {
-        this.runConfig = JSON.parse(runModeConfig);
-        this.runConfig.envMap = new Map();
-        this.runConfig.testPlanDefaultEnvMap = {};
-        this.runConfig.onSampleError =
-          this.runConfig.onSampleError === "true" ||
-          this.runConfig.onSampleError === true;
-        this.runConfig.runWithinResourcePool =
-          this.runConfig.runWithinResourcePool === "true" ||
-          this.runConfig.runWithinResourcePool === true;
+      if (this.type === "plan") {
+        if (runModeConfig) {
+          this.runConfig = JSON.parse(runModeConfig);
+          if (
+            !this.runConfig.envMap ||
+            JSON.stringify(this.runConfig.envMap) === "{}"
+          ) {
+            this.isEnvSaved = false;
+          } else {
+            this.isEnvSaved = true;
+          }
+          this.runConfig.envMap = new Map();
+          this.runConfig.testPlanDefaultEnvMap = {};
+          this.runConfig.onSampleError =
+            this.runConfig.onSampleError === "true" ||
+            this.runConfig.onSampleError === true;
+        } else {
+          this.isEnvSaved = false;
+        }
       }
+      this.runConfig.environmentType = ENV_TYPE.JSON;
       this.runModeVisible = true;
       this.testType = testType;
       this.getResourcePools();
       this.getWsProjects();
       this.showPopover();
-      this.query();
-    },
-    query() {
-      this.loading = true;
-      this.result = getSystemBaseSetting().then((response) => {
-        if (!response.data.runMode) {
-          response.data.runMode = "LOCAL";
-        }
-        this.runMode = response.data.runMode;
-        if (this.runMode === "POOL") {
-          this.runConfig.runWithinResourcePool = true;
-          this.getProjectApplication();
-        } else {
-          this.loading = false;
-        }
-      });
     },
     getProjectApplication() {
       getProjectConfig(getCurrentProjectID(), "").then((res) => {
-        if (res.data && res.data.poolEnable && res.data.resourcePoolId) {
-          this.runConfig.resourcePoolId = res.data.resourcePoolId;
+        let hasPool = false;
+        //判断之前配置的资源池是否在可用资源池中
+        this.resourcePools.forEach((item) => {
+          if (item.id === this.runConfig.resourcePoolId) {
+            hasPool = true;
+          }
+        });
+        if (!hasPool) {
+          if (res.data && res.data.poolEnable && res.data.resourcePoolId) {
+            //判断系统配置的默认资源池是否可用
+            this.resourcePools.forEach((item) => {
+              if (item.id === res.data.resourcePoolId) {
+                hasPool = true;
+              }
+            });
+            if (hasPool) {
+              this.runConfig.resourcePoolId = res.data.resourcePoolId;
+            }
+          }
         }
-        this.loading = false;
+        if (!hasPool) {
+          this.runConfig.resourcePoolId = null;
+        }
       });
     },
     changeMode() {
@@ -362,7 +327,6 @@ export default {
         mode: "serial",
         reportType: "iddReport",
         onSampleError: false,
-        runWithinResourcePool: false,
         resourcePoolId: null,
         envMap: new Map(),
         environmentGroupId: "",
@@ -373,6 +337,12 @@ export default {
       this.$emit("close");
     },
     handleRunBatch() {
+      if (this.runConfig.resourcePoolId == null && this.haveOtherExecCase) {
+        this.$warning(
+          this.$t("workspace.env_group.please_select_run_within_resource_pool")
+        );
+        return;
+      }
       this.runConfig.testPlanDefaultEnvMap = this.defaultEnvMap;
       this.$emit("handleRunBatch", this.runConfig);
       this.close();
@@ -380,6 +350,7 @@ export default {
     getResourcePools() {
       getQuotaValidResourcePools().then((response) => {
         this.resourcePools = response.data;
+        this.getProjectApplication();
       });
     },
     setDefaultEnv(projectId, envId) {
@@ -413,8 +384,8 @@ export default {
             for (let d in data) {
               this.projectIds.add(d);
             }
+            this.$refs.envSelectPopover.open();
           }
-          this.$refs.envSelectPopover.open();
         });
       } else if (this.type === "apiScenario") {
         param = this.planCaseIds;
@@ -425,8 +396,8 @@ export default {
             for (let d in data) {
               this.projectIds.add(d);
             }
+            this.$refs.envSelectPopover.open();
           }
-          this.$refs.envSelectPopover.open();
         });
       } else if (this.type === "plan") {
         param = { id: this.planId };
@@ -434,33 +405,22 @@ export default {
           let data = res.data;
           if (data) {
             this.projectEnvListMap = data;
-            for (let d in data) {
-              this.projectIds.add(d);
-            }
           }
-          if (this.projectIds.size === 0) {
-            param = { id: this.planId };
-            getPlanCaseProjectIds(param).then((res) => {
-              let data = res.data;
-              if (data) {
-                for (let i = 0; i < data.length; i++) {
-                  this.projectIds.add(data[i]);
-                }
+          param = { id: this.planId };
+          getPlanCaseProjectIds(param).then((res) => {
+            let data = res.data;
+            if (data) {
+              for (let i = 0; i < data.length; i++) {
+                this.projectIds.add(data[i]);
               }
-              this.$refs.envSelectPopover.open();
-            });
-          } else {
+            }
             this.$refs.envSelectPopover.open();
-          }
+          });
         });
       }
     },
     handleCommand(command) {
-      if (
-        this.runConfig.runWithinResourcePool &&
-        this.runConfig.resourcePoolId == null &&
-        this.haveOtherExecCase
-      ) {
+      if (this.runConfig.resourcePoolId == null && this.haveOtherExecCase) {
         this.$warning(
           this.$t("workspace.env_group.please_select_run_within_resource_pool")
         );
@@ -481,6 +441,16 @@ export default {
 </script>
 
 <style scoped>
+:deep(.el-dialog__body) {
+  overflow-y: auto;
+  max-height: 350px;
+}
+.env-container {
+  max-height: 400px;
+  overflow-y: auto;
+  padding-bottom: 1px;
+}
+
 .env-container .title {
   width: 100px;
   min-width: 100px;
@@ -503,6 +473,7 @@ export default {
 .radio-change:deep(.el-radio__input.is-checked + .el-radio__label) {
   color: #606266 !important;
 }
+
 .radio-change:deep(.el-checkbox__input.is-checked + .el-checkbox__label) {
   color: #606266 !important;
 }

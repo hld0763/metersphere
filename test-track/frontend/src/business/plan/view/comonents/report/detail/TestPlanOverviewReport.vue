@@ -19,11 +19,15 @@
             {{ resourcePool }}
           </el-form-item>
         </el-col>
-        <el-col :span="8"> </el-col>
+        <el-col :span="8"></el-col>
       </el-row>
       <el-row
         class="select-time"
-        v-if="report.envGroupName || report.projectEnvMap"
+        v-if="
+          report.envGroupName ||
+          (report.projectEnvMap &&
+            JSON.stringify(report.projectEnvMap) !== '{}')
+        "
         style="display: inline-block"
       >
         <div>
@@ -31,14 +35,14 @@
             {{ $t("commons.environment") + ":" }}
           </div>
           <div style="float: right">
-            <div v-if="report.envGroupName" style="margin-left: 42px">
+            <div v-if="report.envGroupName" style="margin-left: 12px">
               <ms-tag
                 type="danger"
                 :content="$t('workspace.env_group.name')"
               ></ms-tag>
               {{ report.envGroupName }}
             </div>
-            <div v-else-if="report.projectEnvMap" style="margin-left: 42px">
+            <div v-else-if="report.projectEnvMap" style="margin-left: 12px">
               <div
                 v-for="(values, key) in report.projectEnvMap"
                 :key="key"
@@ -57,6 +61,13 @@
           </div>
         </div>
       </el-row>
+      <el-row justify="space-between" class="select-time" v-else>
+        <el-col :span="8">
+          <el-form-item :label="$t('commons.environment') + ':'">
+            {{ $t("test_track.report.case_env") }}
+          </el-form-item>
+        </el-col>
+      </el-row>
       <el-row type="flex" justify="space-between" class="select-time">
         <el-col :span="8">
           <el-form-item
@@ -70,7 +81,7 @@
             :label="$t('test_track.report.executive_finish_rate') + ':'"
           >
             {{
-              (report.executeRate ? (report.executeRate * 100).toFixed(1) : 0) +
+              (report.executeRate ? (report.executeRate * 100).toFixed(2) : 0) +
               "%"
             }}
             <ms-instructions-icon
@@ -81,7 +92,7 @@
         <el-col :span="8">
           <el-form-item :label="$t('test_track.report.passing_rate') + ':'">
             {{
-              (report.passRate ? (report.passRate * 100).toFixed(1) : 0) + "%"
+              (report.passRate ? (report.passRate * 100).toFixed(2) : 0) + "%"
             }}
             <ms-instructions-icon
               :content="$t('test_track.report.passing_rate_tip')"

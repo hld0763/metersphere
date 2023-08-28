@@ -291,14 +291,16 @@ export function appendCase(parent, item, isDisable, setParamCallback) {
       if (!(item.steps instanceof Array)) {
         item.steps = JSON.parse(item.steps);
       }
-      item.steps.forEach((step) => {
-        let descData = getNodeData(step.desc, null, isDisable);
-        if (descData) {
-          descData.num = step.num;
-          let descNode = appendChildNode(caseNode, descData);
-          appendChildNode(descNode, getNodeData(step.result, null, isDisable));
-        }
-      });
+      if (item.steps) {
+        item.steps.forEach((step) => {
+          let descData = getNodeData(step.desc, null, isDisable);
+          if (descData) {
+            descData.num = step.num;
+            let descNode = appendChildNode(caseNode, descData);
+            appendChildNode(descNode, getNodeData(step.result, null, isDisable));
+          }
+        });
+      }
     }
   }
 
@@ -409,7 +411,7 @@ function _appendExtraNodes(parent, data) {
 }
 
 /**
- * 去掉已有节点
+ * 清理子节点中的tmp节点
  * @param parent
  */
 function clearChildren(node) {
@@ -417,7 +419,7 @@ function clearChildren(node) {
   if (children) {
     for (let i = 0; i < children.length; i++) {
       let item = children[i];
-      if (item.data.type !== 'node') {
+      if (item.data.type === 'tmp') {
         window.minder.removeNode(item);
         i--;
       }

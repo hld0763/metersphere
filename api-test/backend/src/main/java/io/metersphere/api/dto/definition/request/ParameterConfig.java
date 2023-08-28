@@ -12,7 +12,6 @@ import io.metersphere.base.domain.TestPlanApiCase;
 import io.metersphere.commons.constants.CommonConstants;
 import io.metersphere.commons.constants.ConditionType;
 import io.metersphere.commons.utils.CommonBeanFactory;
-import io.metersphere.constants.RunModeConstants;
 import io.metersphere.environment.ssl.MsKeyStore;
 import io.metersphere.jmeter.utils.ScriptEngineUtils;
 import io.metersphere.plugin.core.MsParameter;
@@ -22,6 +21,7 @@ import io.metersphere.service.definition.ApiTestCaseService;
 import io.metersphere.service.plan.TestPlanApiCaseService;
 import lombok.Data;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.config.Arguments;
 
@@ -30,15 +30,19 @@ import java.util.stream.Collectors;
 
 @Data
 public class ParameterConfig extends MsParameter {
+
+    public ParameterConfig(String currentProjectId, boolean isApi) {
+        this.currentProjectId = currentProjectId;
+        this.setApi(isApi);
+        if (MapUtils.isEmpty(this.config)) {
+            this.config = new HashMap<>();
+        }
+    }
+
     /**
      * 环境配置
      */
     private Map<String, EnvironmentConfig> config;
-
-    /**
-     * UI 指令全局配置
-     */
-    private Object commandConfig;
     /**
      * 缓存同一批请求的认证信息
      */
@@ -61,10 +65,6 @@ public class ParameterConfig extends MsParameter {
      * 公共Cookie
      */
     private boolean enableCookieShare;
-    /**
-     * 是否停止继续
-     */
-    private Boolean onSampleError;
 
     /**
      * 是否是导入/导出操作
@@ -74,13 +74,12 @@ public class ParameterConfig extends MsParameter {
      * 导入/导出操作时取样器的testName值
      */
     private String operatingSampleTestName;
-    /**
-     * 项目ID，支持单接口执行
-     */
-    private String projectId;
 
     private String scenarioId;
-
+    /**
+     * 当前项目id
+     */
+    private String currentProjectId;
     /**
      * 报告 ID
      */
@@ -90,7 +89,6 @@ public class ParameterConfig extends MsParameter {
 
     private boolean runLocal;
 
-    private String browserLanguage;
     private boolean isApi;
     /**
      * 失败重试次数
@@ -103,9 +101,9 @@ public class ParameterConfig extends MsParameter {
 
     private List<String> csvFilePaths = new ArrayList<>();
 
-
     public boolean isEffective(String projectId) {
-        if (this.config != null && this.config.get(projectId) != null) {
+        if ((StringUtils.isNotBlank(projectId) && this.config != null && this.config.get(projectId) != null)
+                || (StringUtils.isNotBlank(this.currentProjectId) && this.config != null && this.config.get(currentProjectId) != null)) {
             return true;
         }
         return false;
@@ -120,9 +118,9 @@ public class ParameterConfig extends MsParameter {
     }
 
 
-    public HttpConfig matchConfig(MsHTTPSamplerProxy samplerProxy) {
-        HttpConfig httpConfig = this.getConfig().get(samplerProxy.getProjectId()).getHttpConfig();
+    public HttpConfig matchConfig(MsHTTPSamplerProxy samplerProxy, HttpConfig httpConfig) {
         boolean isNext = true;
+        httpConfig.setSocket(null);
         if (CollectionUtils.isNotEmpty(httpConfig.getConditions())) {
             for (HttpConfigCondition item : httpConfig.getConditions()) {
                 if (item.getType().equals(ConditionType.PATH.name())) {
@@ -207,24 +205,11 @@ public class ParameterConfig extends MsParameter {
         }
 
         // 数据兼容处理
-        if (this.getConfig() != null && StringUtils.isNotEmpty(samplerProxy.getProjectId()) && this.getConfig().containsKey(samplerProxy.getProjectId())) {
-            // 1.8 之后 当前正常数据
-        } else if (this.getConfig() != null && this.getConfig().containsKey(getParentProjectId(samplerProxy))) {
+      if (StringUtils.isBlank(samplerProxy.getProjectId())
+              && this.getConfig() != null
+              && this.getConfig().containsKey(getParentProjectId(samplerProxy))) {
             // 1.8 前后 混合数据
             samplerProxy.setProjectId(getParentProjectId(samplerProxy));
-        } else {
-            // 1.8 之前 数据
-            if (this.getConfig() != null) {
-                if (!this.getConfig().containsKey(RunModeConstants.HIS_PRO_ID.toString())) {
-                    // 测试计划执行
-                    Iterator<String> it = this.getConfig().keySet().iterator();
-                    if (it.hasNext()) {
-                        samplerProxy.setProjectId(it.next());
-                    }
-                } else {
-                    samplerProxy.setProjectId(RunModeConstants.HIS_PRO_ID.toString());
-                }
-            }
         }
     }
 
@@ -254,5 +239,18 @@ public class ParameterConfig extends MsParameter {
                 }
             });
         }
+    }
+
+    /**
+     * 获取项目环境配置，如果没有则返回当前项目环境配置
+     *
+     * @param projectId 项目ID
+     */
+    public EnvironmentConfig get(String projectId) {
+        EnvironmentConfig envConfig = this.getConfig().get(projectId);
+        if (envConfig == null && StringUtils.isNotEmpty(this.getCurrentProjectId())) {
+            return this.config.get(this.getCurrentProjectId());
+        }
+        return envConfig;
     }
 }

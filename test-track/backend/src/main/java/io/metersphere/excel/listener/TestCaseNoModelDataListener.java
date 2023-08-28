@@ -14,6 +14,7 @@ import io.metersphere.commons.utils.JSON;
 import io.metersphere.commons.utils.LogUtil;
 import io.metersphere.dto.CustomFieldDao;
 import io.metersphere.dto.CustomFieldResourceDTO;
+import io.metersphere.dto.TestCaseNodeDTO;
 import io.metersphere.excel.annotation.NotRequired;
 import io.metersphere.excel.constants.TestCaseImportFiled;
 import io.metersphere.excel.domain.ExcelErrData;
@@ -25,6 +26,7 @@ import io.metersphere.excel.utils.ExcelValidateHelper;
 import io.metersphere.exception.CustomFieldValidateException;
 import io.metersphere.i18n.Translator;
 import io.metersphere.request.testcase.TestCaseImportRequest;
+import io.metersphere.service.TestCaseNodeService;
 import io.metersphere.service.TestCaseService;
 import io.metersphere.validate.AbstractCustomFieldValidator;
 import io.metersphere.validate.CustomFieldValidatorFactory;
@@ -33,6 +35,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.Serial;
 import java.lang.reflect.Field;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -61,6 +64,8 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
     protected static final int BATCH_COUNT = 5000;
 
     private TestCaseService testCaseService;
+
+    private TestCaseNodeService testCaseNodeService;
 
     protected List<TestCaseExcelData> updateList = new ArrayList<>();  //存储待更新用例的集合
 
@@ -104,6 +109,8 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
     private HashMap<String, AbstractCustomFieldValidator> customFieldValidatorMap;
 
     private Map<String, List<CustomFieldResourceDTO>> testCaseCustomFieldMap = new HashMap<>();
+    private Map<String, String> pathMap = new HashMap<>();
+    private List<TestCaseNodeDTO> nodeTrees;
 
     public boolean isUpdated() {
         return isUpdated;
@@ -111,32 +118,36 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
 
     public TestCaseNoModelDataListener(TestCaseImportRequest request, Class c, Set<ExcelMergeInfo> mergeInfoSet) {
         this.mergeInfoSet = mergeInfoSet;
-        this.excelDataClass = c;
-        this.testCaseService = CommonBeanFactory.getBean(TestCaseService.class);
+        excelDataClass = c;
+        testCaseService = CommonBeanFactory.getBean(TestCaseService.class);
+        testCaseNodeService = CommonBeanFactory.getBean(TestCaseNodeService.class);
         customIds = new HashSet<>();
 
         this.request = request;
 
-        this.customFieldValidatorMap = CustomFieldValidatorFactory.getValidatorMap();
+        customFieldValidatorMap = CustomFieldValidatorFactory.getValidatorMap();
 
         List<CustomFieldDao> customFields = request.getCustomFields();
         if (CollectionUtils.isNotEmpty(customFields)) {
             customFieldsMap = customFields.stream().collect(Collectors.toMap(CustomFieldDao::getName, i -> i));
         }
+
+        nodeTrees = testCaseNodeService.getNodeTreeByProjectId(request.getProjectId());
     }
 
     @Override
     public void invokeHeadMap(Map<Integer, String> headMap, AnalysisContext context) {
         this.headMap = headMap;
         try {
-            this.genExcelHeadToFieldNameDicAndGetNotRequiredFields();
+            genExcelHeadToFieldNameDicAndGetNotRequiredFields();
         } catch (NoSuchFieldException e) {
             LogUtil.error(e);
         }
-        this.formatHeadMap();
+        formatHeadMap();
         super.invokeHeadMap(headMap, context);
     }
 
+    @Override
     public void invoke(Map<Integer, String> data, AnalysisContext analysisContext) {
 
         if (headMap == null) {
@@ -149,41 +160,51 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
 
         TestCaseExcelData testCaseExcelData;
         // 读取名称列，如果该列是合并单元格，则读取多行数据后合并步骤
-        if (this.isMergeRow) {
+        if (isMergeRow) {
             if (currentMergeData == null) {
-                this.firstMergeRowIndex = rowIndex;
+                firstMergeRowIndex = rowIndex;
                 // 如果是合并单元格的首行
-                testCaseExcelData = this.parseDataToModel(data);
-                testCaseExcelData.setMergeStepDesc(new ArrayList<>() {{
-                    add(testCaseExcelData.getStepDesc());
-                }});
-                testCaseExcelData.setMergeStepResult(new ArrayList<>() {{
-                    add(testCaseExcelData.getStepResult());
-                }});
+                testCaseExcelData = parseDataToModel(data);
+                testCaseExcelData.setMergeStepDesc(new ArrayList<>() {
+                    @Serial
+                    private static final long serialVersionUID = -2563948462432733672L;
+
+                    {
+                        add(testCaseExcelData.getStepDesc());
+                    }
+                });
+                testCaseExcelData.setMergeStepResult(new ArrayList<>() {
+                    @Serial
+                    private static final long serialVersionUID = 8985001651375529701L;
+
+                    {
+                        add(testCaseExcelData.getStepResult());
+                    }
+                });
                 // 记录下数据并返回
-                this.currentMergeData = testCaseExcelData;
-                if (!this.isMergeLastRow) {
+                currentMergeData = testCaseExcelData;
+                if (!isMergeLastRow) {
                     return;
                 } else {
-                    this.currentMergeData = null;
+                    currentMergeData = null;
                 }
             } else {
                 // 获取存储的数据，并添加多个步骤
-                this.currentMergeData.getMergeStepDesc()
+                currentMergeData.getMergeStepDesc()
                         .add(data.get(getStepDescColIndex()));
-                this.currentMergeData.getMergeStepResult()
+                currentMergeData.getMergeStepResult()
                         .add(data.get(getStepResultColIndex()));
                 // 是最后一行的合并单元格，保存并清空 currentMergeData，走之后的逻辑
-                if (this.isMergeLastRow) {
-                    testCaseExcelData = this.currentMergeData;
-                    this.currentMergeData = null;
+                if (isMergeLastRow) {
+                    testCaseExcelData = currentMergeData;
+                    currentMergeData = null;
                 } else {
                     return;
                 }
             }
         } else {
-            this.firstMergeRowIndex = null;
-            testCaseExcelData = this.parseDataToModel(data);
+            firstMergeRowIndex = null;
+            testCaseExcelData = parseDataToModel(data);
         }
 
         buildUpdateOrErrorList(rowIndex, testCaseExcelData);
@@ -237,8 +258,8 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
      * @param rowIndex
      */
     private void handleMergeData(Map<Integer, String> data, Integer rowIndex) {
-        this.isMergeRow = false;
-        this.isMergeLastRow = false;
+        isMergeRow = false;
+        isMergeLastRow = false;
         if (getNameColIndex() == null) {
             MSException.throwException("缺少名称表头");
         }
@@ -251,7 +272,7 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
                         && col.equals(mergeInfo.getFirstColumnIndex())) {
                     // 根据名称列是否是合并单元格判断是不是同一条用例
                     if (getNameColIndex().equals(col)) {
-                        this.isMergeRow = true;
+                        isMergeRow = true;
                     }
                     // 如果是合并单元格的第一个cell，则把这个单元格的数据存起来
                     if (rowIndex.equals(mergeInfo.getFirstRowIndex())) {
@@ -269,7 +290,7 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
                     if (rowIndex.equals(mergeInfo.getLastRowIndex())) {
                         // 根据名称列是否是合并单元格判断是不是同一条用例
                         if (getNameColIndex().equals(col)) {
-                            this.isMergeLastRow = true;
+                            isMergeLastRow = true;
                             // 清除掉上一次已经遍历完成的数据，提高查询效率
                             iterator.remove();
                             break;
@@ -294,7 +315,9 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
     }
 
     private void validateDbExist(TestCaseExcelData data, StringBuilder stringBuilder) {
-        if (this.isUpdateModel()) {
+        //  校验模块是否存在，没有存在则新建一个模块
+        testCaseNodeService.createNodeByNodePath(data.getNodePath(), request.getProjectId(), nodeTrees, pathMap);
+        if (isUpdateModel()) {
             return;
         }
         if (request.getTestCaseNames().contains(data.getName())) {
@@ -304,6 +327,7 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
             String steps = getSteps(data);
             testCase.setSteps(steps);
 
+            testCase.setNodeId(pathMap.get(testCase.getNodePath()));
             boolean dbExist = testCaseService.exist(testCase);
             boolean excelExist = false;
 
@@ -399,6 +423,7 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
     /**
      * 校验自定义字段，并记录错误提示
      * 如果填写的是自定义字段的选项值，则转换成ID保存
+     *
      * @param data
      * @param stringBuilder
      */
@@ -448,13 +473,6 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
         //校验”所属模块"
         if (nodePath != null) {
             String[] nodes = nodePath.split("/");
-            //校验模块深度
-            if (nodes.length > TestCaseConstants.MAX_NODE_DEPTH + 1) {
-                stringBuilder.append(Translator.get("test_case_node_level_tip"))
-                        .append(TestCaseConstants.MAX_NODE_DEPTH)
-                        .append(Translator.get("test_case_node_level"))
-                        .append("; ");
-            }
             //模块名不能为空
             for (int i = 0; i < nodes.length; i++) {
                 if (i != 0 && StringUtils.equals(nodes[i].trim(), StringUtils.EMPTY)) {
@@ -506,11 +524,11 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
     }
 
     public List<String> getNames() {
-        return this.names;
+        return names;
     }
 
     public List<String> getIds() {
-        return this.ids;
+        return ids;
     }
 
     public void setNames(List<String> names) {
@@ -528,27 +546,27 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
             return;
         }
         if ((isCreateModel() && CollectionUtils.isEmpty(list)) || (isUpdateModel() && CollectionUtils.isEmpty(updateList))) {
-           MSException.throwException(Translator.get("no_legitimate_case_tip"));
+            MSException.throwException(Translator.get("no_legitimate_case_tip"));
         }
 
         if (CollectionUtils.isNotEmpty(list)) {
             List<TestCaseWithBLOBs> result = list.stream()
-                    .map(item -> this.convert2TestCase(item))
+                    .map(item -> convert2TestCase(item))
                     .collect(Collectors.toList());
-            testCaseService.saveImportData(result, request, testCaseCustomFieldMap);
-            this.names = result.stream().map(TestCase::getName).collect(Collectors.toList());
-            this.ids = result.stream().map(TestCase::getId).collect(Collectors.toList());
-            this.isUpdated = true;
+            testCaseService.saveImportData(result, request, testCaseCustomFieldMap, pathMap);
+            names = result.stream().map(TestCase::getName).collect(Collectors.toList());
+            ids = result.stream().map(TestCase::getId).collect(Collectors.toList());
+            isUpdated = true;
         }
 
         if (CollectionUtils.isNotEmpty(updateList)) {
             List<TestCaseWithBLOBs> result2 = updateList.stream()
-                    .map(item -> this.convert2TestCaseForUpdate(item))
+                    .map(item -> convert2TestCaseForUpdate(item))
                     .collect(Collectors.toList());
             testCaseService.updateImportData(result2, request, testCaseCustomFieldMap);
-            this.isUpdated = true;
-            this.names = result2.stream().map(TestCase::getName).collect(Collectors.toList());
-            this.ids = result2.stream().map(TestCase::getId).collect(Collectors.toList());
+            isUpdated = true;
+            names = result2.stream().map(TestCase::getName).collect(Collectors.toList());
+            ids = result2.stream().map(TestCase::getId).collect(Collectors.toList());
             updateList.clear();
         }
     }
@@ -568,6 +586,7 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
 
     /**
      * 暂存功能自定义字段
+     *
      * @param data
      * @param testCase
      */
@@ -576,7 +595,7 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
         Set<String> textFieldSet = data.getTextFieldSet();
         List<CustomFieldResourceDTO> testCaseCustomFields = new ArrayList<>();
         customData.forEach((k, v) -> {
-            if ((v instanceof List && CollectionUtils.isNotEmpty((List)v))
+            if ((v instanceof List && CollectionUtils.isNotEmpty((List) v))
                     || StringUtils.isNotBlank(v.toString())) {
                 CustomFieldDao customFieldDao = customFieldsMap.get(k);
                 if (customFieldDao != null) {
@@ -658,81 +677,82 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
      */
     public String modifyTagPattern(TestCaseExcelData data) {
         String tags = data.getTags();
-        try {
-            if (StringUtils.isNotBlank(tags)) {
-                JSON.parseArray(tags);
-                return tags;
-            }
-            return "[]";
-        } catch (Exception e) {
-            if (tags != null) {
-                //当标签值以中英文的逗号和分号分隔时才能正确解析
-                Stream<String> stringStream = Arrays.stream(tags.split("[,;，；\"\\r|\\n|\\r\\n\"]"));
-                //替换非法字符反斜杠"\"为"\\"
-                List<String> tagList = stringStream.map(tag -> tag = "\"" + tag.replaceAll("\\\\", "\\\\\\\\") + "\"")
-                        .collect(Collectors.toList());
-                String modifiedTags = StringUtils.join(tagList, ",");
-                modifiedTags = "[" + modifiedTags + "]";
-                return modifiedTags;
-            } else {
-                return "[]";
-            }
+        if (StringUtils.isNotBlank(tags)) {
+            //当标签值以中英文的逗号和分号分隔时才能正确解析
+            Stream<String> stringStream = Arrays.stream(tags.split("[,;，；\"\\r|\\n|\\r\\n\"]"));
+            //替换非法字符反斜杠"\"为"\\"
+            List<String> tagList = stringStream.map(tag -> tag = "\"" + tag.replaceAll("\\\\", "\\\\\\\\") + "\"")
+                    .collect(Collectors.toList());
+            String modifiedTags = StringUtils.join(tagList, ",");
+            modifiedTags = "[" + modifiedTags + "]";
+            return modifiedTags;
         }
+        return "[]";
     }
 
+    /**
+     * 解析合并步骤描述, 预期结果单元格数据
+     *
+     * @param data Excel数据
+     * @return 步骤JSON-String
+     */
     public String getSteps(TestCaseExcelData data) {
-        List jsonArray = new ArrayList<>();
+        List<Map<String, Object>> steps = new ArrayList<>();
 
-        // 如果是合并单元格，则组合多条单元格的数据
-        if (CollectionUtils.isNotEmpty(data.getMergeStepDesc())
-                || CollectionUtils.isNotEmpty(data.getMergeStepResult())) {
+        if (CollectionUtils.isNotEmpty(data.getMergeStepDesc()) || CollectionUtils.isNotEmpty(data.getMergeStepResult())) {
+            // 如果是合并单元格，则组合多条单元格的数据
             for (int i = 0; i < data.getMergeStepDesc().size(); i++) {
-                Map<String, Object> step = new LinkedHashMap<>();
-                step.put("num", i + 1);
-                step.put("desc", Optional.ofNullable(data.getMergeStepDesc().get(i)).orElse(StringUtils.EMPTY));
-                step.put("result", Optional.ofNullable(data.getMergeStepResult().get(i)).orElse(StringUtils.EMPTY));
-                jsonArray.add(step);
+                List<Map<String, Object>> rowSteps = getSingleRowSteps(data.getMergeStepDesc().get(i), data.getMergeStepResult().get(i), steps.size());
+                steps.addAll(rowSteps);
             }
-            return JSON.toJSONString(jsonArray);
+        } else {
+            // 如果不是合并单元格，则直接解析单元格数据
+            steps.addAll(getSingleRowSteps(data.getStepDesc(), data.getStepResult(), steps.size()));
         }
+        return JSON.toJSONString(steps);
+    }
+
+    /**
+     * 解析单行步骤描述, 预期结果数据
+     *
+     * @param cellDesc       步骤描述
+     * @param cellResult     预期结果
+     * @param startStepIndex 步骤开始序号
+     * @return 步骤JSON-String
+     */
+    private List<Map<String, Object>> getSingleRowSteps(String cellDesc, String cellResult, Integer startStepIndex) {
+        List<Map<String, Object>> steps = new ArrayList<>();
 
         List<String> stepDescList = new ArrayList<>();
         List<String> stepResList = new ArrayList<>();
-
-        Set<Integer> rowNums = new HashSet<>();
-        if (data.getStepDesc() != null) {
-            String[] stepDesc = data.getStepDesc().split("\r|\n|\r\n");
-
-            int rowIndex = 1;
-            for (String row : stepDesc) {
-                RowInfo rowInfo = this.parseIndexInRow(row, rowIndex);
-                stepDescList.add(rowInfo.rowInfo);
-                rowNums.add(rowIndex++);
+        if (StringUtils.isNotEmpty(cellDesc)) {
+            // 根据[1], [2]...分割步骤描述, 开头空字符去掉, 末尾保留
+            String[] stepDesc = cellDesc.split("\\[\\d+]", -1);
+            if (StringUtils.isEmpty(stepDesc[0])) {
+                stepDesc = Arrays.copyOfRange(stepDesc, 1, stepDesc.length);
             }
+
+            stepDescList.addAll(Arrays.asList(stepDesc));
         } else {
             stepDescList.add(StringUtils.EMPTY);
         }
 
-        if (data.getStepResult() != null) {
-            String[] stepRes = data.getStepResult().split("\r|\n|\r\n");
-            int lastStepIndex = 1;
-            for (String row : stepRes) {
-                RowInfo rowInfo = this.parseIndexInRow(row, lastStepIndex);
-                String rowMessage = rowInfo.rowInfo;
-                stepResList.add(rowMessage);
-                lastStepIndex++;
+        if (StringUtils.isNotEmpty(cellResult)) {
+            // 根据[1], [2]...分割步骤描述, 开头空字符去掉, 末尾保留
+            String[] stepRes = cellResult.split("\\[\\d+]", -1);
+            if (StringUtils.isEmpty(stepRes[0])) {
+                stepRes = Arrays.copyOfRange(stepRes, 1, stepRes.length);
             }
+            stepResList.addAll(Arrays.asList(stepRes));
         } else {
             stepResList.add(StringUtils.EMPTY);
         }
 
-        int index = stepDescList.size() > stepResList.size() ? stepDescList.size() : stepResList.size();
-
+        int index = Math.max(stepDescList.size(), stepResList.size());
         for (int i = 0; i < index; i++) {
-
             // 保持插入顺序，判断用例是否有相同的steps
             Map<String, Object> step = new LinkedHashMap<>();
-            step.put("num", i + 1);
+            step.put("num", startStepIndex + i + 1);
             if (i < stepDescList.size()) {
                 step.put("desc", stepDescList.get(i));
             } else {
@@ -745,48 +765,9 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
                 step.put("result", StringUtils.EMPTY);
             }
 
-            jsonArray.add(step);
+            steps.add(step);
         }
-        return JSON.toJSONString(jsonArray);
-    }
-
-    private RowInfo parseIndexInRow(String row, int rowIndex) {
-        RowInfo rowInfo = new RowInfo();
-        String parseString = row;
-
-        int index = -1;
-        String rowMessage = row;
-        String[] indexSplitCharArr = new String[]{")", "）", "]", "】", ".", ",", "，", "。"};
-        if (StringUtils.startsWithAny(row, "(", "（", "[", "【")) {
-            parseString = parseString.substring(1);
-        }
-        for (String splitChar : indexSplitCharArr) {
-            if (StringUtils.contains(parseString, splitChar)) {
-                String[] rowSplit = StringUtils.split(parseString, splitChar);
-                if (rowSplit.length > 0) {
-                    String indexString = rowSplit[0];
-                    if (StringUtils.isNumeric(indexString) && indexString.equals(String.valueOf(rowIndex))) {
-                        try {
-                            index = Integer.parseInt(indexString);
-                            rowMessage = StringUtils.substring(parseString, indexString.length() + splitChar.length());
-                        } catch (Exception e) {
-                        }
-
-                        if (index > -1) {
-                            break;
-                        } else {
-                            rowMessage = row;
-                        }
-                    }
-                }
-            }
-        }
-        rowInfo.index = index;
-        if (rowMessage == null) {
-            rowMessage = StringUtils.EMPTY;
-        }
-        rowInfo.rowInfo = rowMessage;
-        return rowInfo;
+        return steps;
     }
 
     private Integer getNameColIndex() {
@@ -858,13 +839,13 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
     }
 
     public List<ExcelErrData<TestCaseExcelData>> getErrList() {
-        return this.errList;
+        return errList;
     }
 
     @Override
     public void doAfterAllAnalysed(AnalysisContext analysisContext) {
         // 如果文件最后一行是没有内容的步骤，这里处理最后一条合并单元格的数据
-        if (this.currentMergeData != null) {
+        if (currentMergeData != null) {
             buildUpdateOrErrorList(firstMergeRowIndex, currentMergeData);
         }
         saveData();

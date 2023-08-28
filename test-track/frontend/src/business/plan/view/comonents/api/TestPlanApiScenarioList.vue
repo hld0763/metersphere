@@ -99,7 +99,7 @@
             min-width="150"
           >
             <template v-slot:default="{ row }">
-              <div v-if="row.envs">
+              <div v-if="row.envs && JSON.stringify(row.envs) !== '{}'">
                 <span v-for="(k, v, index) in row.envs" :key="index">
                   <span v-if="index === 0 || index === 1">
                     <span class="project-name" :title="v">{{ v }}</span
@@ -128,6 +128,9 @@
                     />
                   </el-popover>
                 </span>
+              </div>
+              <div v-else>
+                {{ $t('api_test.environment.default_environment') }}
               </div>
             </template>
           </ms-table-column>
@@ -269,6 +272,7 @@
     <ms-test-plan-run-mode-with-env
       @handleRunBatch="handleRunBatch"
       ref="runMode"
+      :plan-id="planId"
       :plan-case-ids="planCaseIds"
       :type="'apiScenario'"
       @close="search"
@@ -282,15 +286,9 @@
 import MsTableHeader from "metersphere-frontend/src/components/MsTableHeader";
 import MsTablePagination from "metersphere-frontend/src/components/pagination/TablePagination";
 import MsTag from "metersphere-frontend/src/components/MsTag";
-import {
-  getCurrentProjectID,
-  getCurrentWorkspaceId,
-} from "metersphere-frontend/src/utils/token";
-import { getUUID, strMapToObj } from "metersphere-frontend/src/utils";
-import {
-  hasLicense,
-  hasPermission,
-} from "metersphere-frontend/src/utils/permission";
+import {getCurrentProjectID,} from "metersphere-frontend/src/utils/token";
+import {getUUID, strMapToObj} from "metersphere-frontend/src/utils";
+import {hasLicense, hasPermission,} from "metersphere-frontend/src/utils/permission";
 import MsTableMoreBtn from "metersphere-frontend/src/components/table/TableMoreBtn";
 import TestPlanScenarioListHeader from "./TestPlanScenarioListHeader";
 import {
@@ -299,18 +297,18 @@ import {
   getCustomTableWidth,
   initCondition,
 } from "metersphere-frontend/src/utils/tableUtils";
-import { TEST_PLAN_SCENARIO_CASE } from "metersphere-frontend/src/utils/constants";
+import {TEST_PLAN_SCENARIO_CASE} from "metersphere-frontend/src/utils/constants";
 import HeaderLabelOperate from "metersphere-frontend/src/components/head/HeaderLabelOperate";
 import BatchEdit from "@/business/case/components/BatchEdit";
 import MsPlanRunMode from "@/business/plan/common/PlanRunModeWithEnv";
 import PriorityTableItem from "@/business/common/tableItems/planview/PriorityTableItem";
-import { API_SCENARIO_FILTERS } from "metersphere-frontend/src/utils/table-constants";
+import {API_SCENARIO_FILTERS} from "metersphere-frontend/src/utils/table-constants";
 import MsTaskCenter from "metersphere-frontend/src/components/task/TaskCenter";
 import MsTable from "metersphere-frontend/src/components/table/MsTable";
 import MsTableColumn from "metersphere-frontend/src/components/table/MsTableColumn";
 import MsUpdateTimeColumn from "metersphere-frontend/src/components/table/MsUpdateTimeColumn";
 import MsCreateTimeColumn from "metersphere-frontend/src/components/table/MsCreateTimeColumn";
-import { editTestPlanScenarioCaseOrder } from "@/api/remote/plan/test-plan";
+import {editTestPlanScenarioCaseOrder} from "@/api/remote/plan/test-plan";
 import {
   testPlanScenarioCaseBatchDelete,
   testPlanScenarioCaseBatchUpdateEnv,
@@ -319,12 +317,13 @@ import {
   testPlanScenarioCaseSelectAllTableRows,
   testPlanScenarioList,
 } from "@/api/remote/plan/test-plan-scenario";
-import { apiAutomationReduction } from "@/api/remote/api/api-automation";
+import {apiAutomationReduction} from "@/api/remote/api/api-automation";
 import MicroApp from "metersphere-frontend/src/components/MicroApp";
 import MsTestPlanApiStatus from "@/business/plan/view/comonents/api/TestPlanApiStatus";
-import { getVersionFilters } from "@/business/utils/sdk-utils";
-import { TEST_PLAN_API_SCENARIO_CONFIGS } from "metersphere-frontend/src/components/search/search-components";
+import {getVersionFilters} from "@/business/utils/sdk-utils";
+import {TEST_PLAN_API_SCENARIO_CONFIGS} from "metersphere-frontend/src/components/search/search-components";
 import MsTestPlanRunModeWithEnv from "@/business/plan/common/TestPlanRunModeWithEnv";
+import {getProject} from "@/api/project";
 
 export default {
   name: "MsTestPlanApiScenarioList",
@@ -600,7 +599,7 @@ export default {
     showReport(row) {
       this.runVisible = true;
       this.infoDb = true;
-      this.reportId = row.reportId;
+      this.reportId = getUUID() + "[TEST-PLAN-REDIRECT]" + row.reportId;
     },
     remove(row) {
       if (this.planId) {
@@ -678,17 +677,23 @@ export default {
       }
     },
     openById(item) {
-      let automationData = this.$router.resolve(
-        "/api/automation/default/" +
-          getUUID() +
-          "/scenario/edit:" +
-          item.caseId +
-          "/" +
-          item.projectId +
-          "/" +
-          getCurrentWorkspaceId()
-      );
-      window.open(automationData.href, "_blank");
+      let projectId = item.projectId;
+      getProject(projectId).then((rsp) => {
+        if (rsp.data) {
+          let workspaceId = rsp.data.workspaceId;
+          let automationData = this.$router.resolve(
+              "/api/automation/default/" +
+              getUUID() +
+              "/scenario/edit:" +
+              item.caseId +
+              "/" +
+              projectId +
+              "/" +
+              workspaceId
+          );
+          window.open(automationData.href, "_blank");
+        }
+      });
     },
     getTagToolTips(tags) {
       try {

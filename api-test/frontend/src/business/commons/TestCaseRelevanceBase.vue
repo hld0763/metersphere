@@ -130,6 +130,7 @@ export default {
     },
 
     open() {
+      this.getWorkSpaceList();
       this.workspaceId = getCurrentWorkspaceId();
       this.getProject();
       this.selectCounts = null;
@@ -202,5 +203,10 @@ export default {
 .ms-header-workspace {
   width: 155px;
   margin-bottom: 10px;
+}
+</style>
+<style>
+.el-select-dropdown__wrap {
+  max-width: 500px;
 }
 </style>

@@ -1,44 +1,45 @@
 <template>
   <test-case-relevance-base
-    @setProject="setProject"
-    @save="saveCaseRelevance"
-    :plan-id="planId"
-    :is-saving="isSaving"
-    ref="baseRelevance"
+      @setProject="setProject"
+      @save="saveCaseRelevance"
+      @close="close"
+      :plan-id="planId"
+      :is-saving="isSaving"
+      ref="baseRelevance"
   >
     <template v-slot:aside>
       <ui-scenario-module
-        @nodeSelectEvent="nodeChange"
-        @refreshTable="refresh"
-        @setModuleOptions="setModuleOptions"
-        :relevance-project-id="projectId"
-        :is-read-only="true"
-        :show-case-num="false"
-        ref="nodeTree"
+          class="node-tree"
+          @nodeSelectEvent="nodeChange"
+          @refreshTable="refresh"
+          @setModuleOptions="setModuleOptions"
+          :relevance-project-id="projectId"
+          :is-read-only="true"
+          :show-case-num="false"
+          ref="nodeTree"
       />
     </template>
 
     <relevance-ui-scenario-list
-      :select-node-ids="selectNodeIds"
-      :trash-enable="trashEnable"
-      :version-enable="versionEnable"
-      :plan-id="planId"
-      :project-id="projectId"
-      @selectCountChange="setSelectCounts"
-      ref="apiScenarioList"
+        :select-node-ids="selectNodeIds"
+        :trash-enable="trashEnable"
+        :version-enable="versionEnable"
+        :plan-id="planId"
+        :project-id="projectId"
+        @selectCountChange="setSelectCounts"
+        ref="apiScenarioList"
     />
   </test-case-relevance-base>
 </template>
 
 <script>
 import TestCaseRelevanceBase from "../base/TestCaseRelevanceBase";
-import { strMapToObj } from "metersphere-frontend/src/utils";
-import { ENV_TYPE } from "metersphere-frontend/src/utils/constants";
+import {strMapToObj} from "metersphere-frontend/src/utils";
+import {ENV_TYPE} from "metersphere-frontend/src/utils/constants";
 import RelevanceUiScenarioList from "@/business/plan/view/comonents/ui/RelevanceUiScenarioList";
-import { testPlanAutoCheck } from "@/api/remote/plan/test-plan";
-import { testPlanUiScenarioRelevanceListIds } from "@/api/remote/ui/test-plan-ui-scenario-case";
+import {testPlanAutoCheck} from "@/api/remote/plan/test-plan";
 import UiScenarioModule from "@/business/plan/view/comonents/ui/UiScenarioModule";
-import { uiAutomationRelevance } from "@/api/remote/ui/api-scenario";
+import {uiAutomationRelevance} from "@/api/remote/ui/api-scenario";
 
 export default {
   name: "TestCaseUiScenarioRelevance",
@@ -76,11 +77,16 @@ export default {
     },
   },
   methods: {
+    close() {
+      this.projectId = "";
+    },
     open() {
+      if (this.$refs.apiScenarioList) {
+        this.$refs.apiScenarioList.search();
+      }
       this.$refs.baseRelevance.open();
       if (this.$refs.apiScenarioList) {
         this.$refs.apiScenarioList.clear();
-        this.$refs.apiScenarioList.search();
       }
     },
     setProject(projectId) {
@@ -118,7 +124,7 @@ export default {
       }
       let param = {};
       param.planId = this.planId;
-      param.mapping = strMapToObj(map);
+      param.mapping = map;
       param.envMap = strMapToObj(envMap);
       param.environmentType = envType;
       param.envGroupId = envGroupId;
@@ -132,14 +138,8 @@ export default {
         this.$refs.baseRelevance.close();
       });
     },
-    getAllId(param) {
-      return new Promise((resolve) => {
-        testPlanUiScenarioRelevanceListIds(param).then((r) => {
-          resolve(r.data);
-        });
-      });
-    },
-    async saveCaseRelevance() {
+
+    saveCaseRelevance() {
       this.isSaving = true;
       let selectIds = [];
       let selectRows = this.$refs.apiScenarioList.selectRows;
@@ -147,48 +147,39 @@ export default {
       let map = this.$refs.apiScenarioList.map;
       let envGroupId = this.$refs.apiScenarioList.envGroupId;
 
-      selectRows.forEach((row) => {
-        selectIds.push(row.id);
-      });
+      if (!this.$refs.apiScenarioList.selectAll) {
+        selectRows.forEach((row) => {
+          selectIds.push(row.id);
+        });
+      } else {
+        selectIds = this.$refs.apiScenarioList.selectAllIds;
+      }
+
       if (selectIds.length < 1) {
         this.isSaving = false;
         this.$warning(this.$t("test_track.plan_view.please_choose_test_case"));
         return;
       }
 
-      if (!envMap || envMap.size == 0) {
-        this.isSaving = false;
-        this.$warning(this.$t("api_test.environment.select_environment"));
-        return;
-      }
-
       let param = {};
       param.planId = this.planId;
-      param.mapping = strMapToObj(map);
+      param.mapping = map;
       param.envMap = strMapToObj(envMap);
       param.envGroupId = envGroupId;
       param.selectIds = selectIds;
-
-      //查找所有数据
-      let params = this.$refs.apiScenarioList.condition;
-      if (params.selectAll) {
-        let result = await this.getAllId(params);
-        param.selectIds = result;
-      }
       this.loading = true;
       uiAutomationRelevance(param)
-        .then(() => {
-          this.loading = false;
-          this.isSaving = false;
-          this.$success(this.$t("commons.save_success"));
-          this.$emit("refresh");
-          this.refresh();
-          this.autoCheckStatus();
-          this.$refs.baseRelevance.close();
-        })
-        .catch(() => {
-          this.isSaving = false;
-        });
+          .then(() => {
+            this.loading = false;
+            this.isSaving = false;
+            this.$success(this.$t("plan.relevance_case_success"));
+            this.$emit("refresh");
+            this.refresh();
+            this.autoCheckStatus();
+          })
+          .catch(() => {
+            this.isSaving = false;
+          });
     },
     autoCheckStatus() {
       //  检查执行结果，自动更新计划状态
@@ -224,5 +215,12 @@ export default {
   top: -13px !important;
   left: -30px;
   width: 30px;
+}
+
+.node-tree {
+  margin-top: 15px;
+  margin-bottom: 15px;
+  max-height: calc(75vh - 120px);
+  overflow-y: auto;
 }
 </style>

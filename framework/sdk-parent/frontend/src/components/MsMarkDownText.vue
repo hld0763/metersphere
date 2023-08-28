@@ -19,6 +19,8 @@
 </template>
 
 <script>
+import {mavonEditor} from 'mavon-editor';
+import 'mavon-editor/dist/css/index.css';
 import {getCurrentUser} from "../utils/token";
 import {getUUID} from "../utils";
 import {deleteMarkDownImg, uploadMarkDownImg} from "../api/img";
@@ -26,7 +28,7 @@ import {DEFAULT_XSS_ATTR} from "../utils/constants";
 
 export default {
   name: "MsMarkDownText",
-  components: {},
+  components: {mavonEditor},
   props: {
     data: Object,
     placeholder: String,
@@ -162,6 +164,11 @@ export default {
     }
   },
   mounted() {
+    let markdownIt = this.$refs.md.markdownIt;
+    if (markdownIt) {
+      // 解决英文引号变成中文引号的问题
+      markdownIt.options.typographer = false;
+    }
     if (!this.disabled) {
       // 点击编辑，失去焦点展示
       let el = document.getElementById(this.id);

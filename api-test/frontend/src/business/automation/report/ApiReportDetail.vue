@@ -1,6 +1,6 @@
 <template>
   <div>
-    <ms-container v-loading="loading || reportExportVisible">
+    <ms-container class="page" v-loading="loading || reportExportVisible">
       <ms-main-container>
         <el-card>
           <section class="report-container" v-if="this.report.testId">
@@ -244,9 +244,6 @@ export default {
     filterNodes(node, status) {
       if (status === 'ERROR' || status === 'FAKE_ERROR' || status === 'UN_EXECUTE') {
         let data = { ...node };
-        if (!data.value && (!data.children || data.children.length === 0)) {
-          return null;
-        }
         if (data.children.length > 0) {
           let filteredChildren = [];
           for (let i = 0; i < data.children.length; i++) {
@@ -265,7 +262,16 @@ export default {
               return data;
             }
           } else if (status === 'UN_EXECUTE') {
-            if (data.value && data.value.status === 'PENDING') {
+            if (data.value && data.value.status === 'PENDING' && data.type !== 'IfController') {
+              return data;
+            }
+            if (
+              (data.type === 'IfController' ||
+                data.type === 'GenericController' ||
+                data.type === 'LoopController' ||
+                data.type === 'TransactionController') &&
+              data.totalStatus === 'PENDING'
+            ) {
               return data;
             }
           } else if (status === 'ERROR') {
@@ -756,6 +762,8 @@ export default {
     },
     startExport() {
       if (this.report.reportVersion && this.report.reportVersion > 1) {
+        // 多次点击导出报告, 场景步骤未清空#771;
+        this.content.scenarios = [];
         if (this.report.reportType === 'API_INTEGRATED' || this.report.reportType === 'UI_INTEGRATED') {
           let scenario = { name: '', requestResults: [] };
           this.content.scenarios = [scenario];
@@ -902,6 +910,9 @@ export default {
 </style>
 
 <style scoped>
+.page {
+  min-height: 80vh;
+}
 .report-container {
   height: calc(100vh - 70px);
   min-height: 600px;

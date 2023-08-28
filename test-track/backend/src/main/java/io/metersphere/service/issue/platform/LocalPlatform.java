@@ -39,12 +39,11 @@ public class LocalPlatform extends LocalAbstractPlatform {
             List<CustomFieldItemDTO> customFields = issuesRequest.getRequestFields();
             String customFieldStr = JSON.toJSONString(customFields);
             List<TestCaseBatchRequest.CustomFiledRequest> fields = JSON.parseArray(customFieldStr, TestCaseBatchRequest.CustomFiledRequest.class);
-            for (TestCaseBatchRequest.CustomFiledRequest field : fields) {
+            for (TestCaseBatchRequest.CustomFiledRequest field : fields)
                 if (StringUtils.equals("状态", field.getName())) {
                     issueStatus = (String) field.getValue();
                     break;
                 }
-            }
         }
         SessionUser user = SessionUtils.getUser();
         String id = UUID.randomUUID().toString();
@@ -56,8 +55,9 @@ public class LocalPlatform extends LocalAbstractPlatform {
         issues.setReporter(user.getId());
         issues.setCreateTime(System.currentTimeMillis());
         issues.setUpdateTime(System.currentTimeMillis());
-        issues.setPlatform(IssuesManagePlatform.Local.toString());;
+        issues.setPlatform(IssuesManagePlatform.Local.toString());
         issues.setNum(getNextNum(issuesRequest.getProjectId()));
+        issues.setCreator(SessionUtils.getUserId());
         issuesMapper.insert(issues);
 
         issuesRequest.setId(id);
