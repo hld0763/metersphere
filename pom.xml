@@ -97,6 +97,7 @@
         <module>system-setting</module>
         <module>test-track</module>
         <module>workstation</module>
+        <module>demo</module>
     </modules>
 
     <dependencies>

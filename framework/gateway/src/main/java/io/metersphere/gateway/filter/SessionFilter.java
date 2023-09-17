@@ -17,7 +17,7 @@ import java.util.Optional;
 @Component
 public class SessionFilter implements WebFilter {
     // 所有模块的前缀
-    private static final String[] PREFIX = new String[]{"/setting", "/project", "/api", "/performance", "/track", "/workstation", "/ui", "/report"};
+    private static final String[] PREFIX = new String[]{"/setting", "/project", "/api", "/performance", "/track", "/workstation", "/ui", "/report", "/demo"};
     private static final String[] TO_SUB_SERVICE = new String[]{"/license", "/system", "/resource", "/sso/callback/logout", "/sso/callback/cas/logout"};
     private static final String PERFORMANCE_DOWNLOAD_PREFIX = "/jmeter/";
     private static final String API_DOWNLOAD_PREFIX = "/api/jmeter/";

@@ -46,6 +46,15 @@
         </el-card>
       </el-col>
     </el-row>
+    <el-row :gutter="12">
+      <el-col :span="8">
+        <el-card shadow="hover">
+          {{ $t('demo.title') }}
+          <el-switch v-model="demo" @change="update('demo')" active-value="ENABLE"
+                     inactive-value="DISABLE" :disabled="disabled"/>
+        </el-card>
+      </el-col>
+    </el-row>
   </div>
 </template>
 
@@ -65,6 +74,7 @@ export default {
   data() {
     return {
       api: "ENABLE",
+      demo: "ENABLE",
       performance: "ENABLE",
       project: "ENABLE",
       report: "ENABLE",

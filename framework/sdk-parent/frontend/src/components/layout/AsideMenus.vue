@@ -76,6 +76,12 @@
         <span slot="title" class="ms-menu-item-title">{{ $t('commons.system_setting') }}</span>
       </div>
     </el-menu-item>
+    <el-menu-item index="/demo" v-if="check('demo')">
+      <div>
+        <svg-icon iconClass="logo" class-name="ms-menu-img"/>
+        <span slot="title" class="ms-menu-item-title">{{ $t('demo.title') }}</span>
+      </div>
+    </el-menu-item>
   </el-menu>
 </template>
 
